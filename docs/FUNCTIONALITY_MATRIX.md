@@ -15,4 +15,4 @@ Inventário da superfície publicada pelo `presentation.js` no baseline congelad
 | Relatórios (`reports`) | `csv`, `issue` |
 | Configurações (`settings`) | `backup`, `restore` |
 
-Total no contrato atual: **10 telas** e **18 ações de usuário**. O inventário é referência de migração; homologação completa exige testes de execução e UI separados.
+Total no contrato atual: **10 telas** e **17 ações de usuário**. O inventário é referência de migração; homologação completa exige testes de execução e UI separados.

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "nutricionistaalmeidavh-spec/SistemasNichadosAgroFrota",
+  "sourceCommit": "a95bd0176ad4053276c5588d3170d18fe5c24c8e",
+  "strategy": "pinned-migration-snapshot",
+  "packages": [
+    "domain-finance",
+    "product-documents",
+    "product-inventory",
+    "product-security",
+    "ui-shell",
+    "vertical-persistence"
+  ],
+  "vendorModules": [
+    "artisys-audit-log",
+    "artisys-auth-rbac",
+    "artisys-inventory",
+    "artisys-pdf",
+    "artisys-reporting",
+    "artisys-storage"
+  ],
+  "requiredPaidServices": []
+}

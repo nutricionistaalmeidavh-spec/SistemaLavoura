@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "agro-lavoura",
+  "corePolicy": {"selfHosted": true, "openSourceCore": true, "requiredPaidServices": []},
+  "utilidades": {"required": ["artisys-storage","artisys-backup","artisys-auth-rbac","artisys-settings","artisys-alerts"], "optional": ["artisys-planning","artisys-inventory","artisys-reporting","artisys-capture","artisys-pwa-runtime","artisys-sync","artisys-catalog","artisys-audit-log","artisys-files","artisys-importer","artisys-feature-flags"]},
+  "targets": ["desktop","pwa"],
+  "migrations": "./migrations",
+  "seeds": "./seeds",
+  "branding": "./branding/brand.json"
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "productId": "agro-lavoura",
+  "databaseFile": "artisys-safras-talhoes.sqlite",
+  "migrationNamespace": "agro-lavoura",
+  "migrationDir": "../migrations",
+  "seedId": "agro-lavoura-demo-v1",
+  "seedPath": "../seeds/demo.json"
+}

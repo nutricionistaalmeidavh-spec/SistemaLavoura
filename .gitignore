@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.qa/
+.artisys-data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

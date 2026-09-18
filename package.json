@@ -1,0 +1,14 @@
+{
+  "name": "@artisys-products/sistema-lavoura",
+  "version": "0.1.0-migration.1",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:domain": "node --test tests/domain.test.js tests/ui.test.js",
+    "test:standalone": "node --test tests/standalone-runtime.test.js",
+    "check:imports": "node tooling/check-standalone-imports.mjs",
+    "check": "npm run check:imports && npm test"
+  }
+}

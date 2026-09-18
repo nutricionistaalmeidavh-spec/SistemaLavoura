@@ -36,8 +36,8 @@ export function createAgroShellModel({ capabilities = [] } = {}) {
       name: 'ArtiSys Agro Lavoura',
       productName: 'ArtiSys Agro Lavoura',
       theme: agroTheme,
-      frontendPattern: 'frontEnds/shells/desktop-admin',
-      mobilePattern: 'frontEnds/shells/mobile-operational'
+      frontendPattern: 'desktop-admin',
+      mobilePattern: 'mobile-operational'
     },
     capabilities,
     navigation

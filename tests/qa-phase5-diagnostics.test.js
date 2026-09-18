@@ -12,6 +12,9 @@ test('phase5 release QA preserves raw diagnostics and fallback summary', () => {
   assert.match(wrapper, /lastFailure/);
   assert.match(wrapper, /phase5-summary-missing|phase5-exit-without-diagnostic/);
   assert.doesNotMatch(wrapper, /Set-StrictMode/, 'NVM4W npm.ps1 is incompatible with inherited StrictMode');
+  assert.match(wrapper, /Get-Command\s+npm\.cmd/, 'Phase 5 must resolve npm.cmd directly on Windows');
+  assert.match(wrapper, /&\s+\$NpmCommand\s+run\s+phase5:raw/, 'Phase 5 must invoke the resolved npm.cmd executable');
+  assert.doesNotMatch(wrapper, /&\s+npm\s+run\s+phase5:raw/, 'PowerShell must not resolve the NVM4W npm.ps1 shim');
 
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
   assert.ok(pkg.scripts['phase5:raw'], 'phase5:raw must preserve the original phase5 command');

@@ -1,0 +1,21 @@
+{
+  "productId": "agro-lavoura",
+  "databaseFile": "artisys-safras-talhoes.sqlite",
+  "migrationIds": ["agro-lavoura/001-initial.sql"],
+  "persistence": [
+    {"file":"persistence/product.persistence.json","productId":"agro-lavoura","databaseFile":"artisys-safras-talhoes.sqlite","migrationNamespace":"agro-lavoura"}
+  ],
+  "screens": ["overview","fields","seasons","operations","inputs","harvest","inventory","finance","reports","settings"],
+  "actions": {
+    "overview": [],
+    "fields": ["save","remove"],
+    "seasons": ["save"],
+    "operations": ["schedule","start","complete","cancel"],
+    "inputs": ["save"],
+    "harvest": ["create"],
+    "inventory": ["receive","consume"],
+    "finance": ["addExpense","addIncome"],
+    "reports": ["csv","issue"],
+    "settings": ["backup","restore"]
+  }
+}

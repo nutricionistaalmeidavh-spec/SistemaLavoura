@@ -2,7 +2,7 @@
 
 Estado desejado da Fase 4: este repositório passa a ser a fonte canônica de ArtiSys Lavoura somente após todos os gates abaixo estarem verdes.
 
-- `npm ci`
+- `npm install --no-audit --no-fund`
 - `npx playwright install chromium`
 - `npm run check`
 - `npm run qa:web`

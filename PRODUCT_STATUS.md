@@ -6,81 +6,128 @@
 - Banco: `artisys-safras-talhoes.sqlite`
 - Migration obrigatória: `agro-lavoura/001-initial.sql`
 - Telas contratadas: **10**
-- Ações contratadas: **17**
+- Ações funcionais contratadas: **37** (**17 P0 + 11 P1 + 9 P2**)
 - Dependência obrigatória paga: **nenhuma**
-- Operação: local-first / self-hosted
+- Operação: **local-first / self-hosted**
+- Targets: desktop Electron + PWA/web
 
 ## P0 — integridade
 
-O P0 cobre autenticação/RBAC, backup e recuperação, auditoria, QA, segurança, certificação de release e a fronteira transacional de comandos.
+Concluído. Cobre autenticação/RBAC, backup/restore, audit-log, validação de domínio, comando central, transação atômica/rollback, QA funcional das 17 ações originais, compatibilidade, build Windows e certificação fail-closed.
 
-### Segurança e RBAC
+- Cada comando registra `attempt`, `success` ou `failure`.
+- Desktop usa uma transação SQLite por comando; PWA usa snapshot/rollback serializado.
+- Restore preserva auditoria posterior ao backup.
+- `tooling/qa-phase5.mjs` executa **17/17 ações P0**.
 
-- `settings`, `backup` e `restore` usam permissões explícitas; pela política atual ficam restritos ao `admin`.
-- writes de `fields`, `seasons`, `inputs` e `operationTypes` passam pelos validadores de domínio antes da persistência.
-- regressões de autorização e validação são executadas pela suíte automatizada.
+## P1 — arquitetura e operação
 
-### Comandos, transações e auditoria
+Concluído. Adiciona **12 módulos** e **11 ações funcionais**:
 
-- todas as ações de negócio expostas pelo backend passam por `runtime/commands.mjs`.
-- cada comando registra auditoria de `attempt`, `success` ou `failure`, com `commandId` e contexto da ação.
-- comandos persistentes no desktop executam em uma única transação SQLite, com rollback integral em falha e suporte seguro a operações de persistência aninhadas.
-- a persistência da PWA usa snapshot/rollback local e serialização de comandos; falhas ao criar o snapshot não bloqueiam a fila seguinte.
-- `reports.csv`, `settings.backup` e `settings.restore` ficam fora da transação de negócio por serem, respectivamente, leitura ou operações de recuperação que quiescem/substituem o banco.
-- restore preserva registros de auditoria criados depois do backup escolhido, tanto no SQLite quanto no armazenamento local do navegador.
+- EventBus durável com retry;
+- workflow engine agrícola;
+- inventory e alerta de estoque baixo;
+- settings persistentes;
+- reporting e dashboard;
+- planning com progresso/conflitos;
+- alerts com acknowledge/snooze/dismiss;
+- importer/exporter;
+- search local accent-insensitive;
+- finance-domain determinístico.
 
-### Product QA
+`tooling/qa-p1.mjs` exige **12/12 módulos** e **11/11 ações P1**, preservando o contrato P0.
 
-A Fase 5 não valida apenas a existência da superfície. Ela executa funcionalmente as **17/17 ações contratadas** pelo mesmo backend usado pelo produto:
+## P2 — produto agrícola
 
-- talhões: `save`, `remove`
-- safras: `save`
-- operações: `schedule`, `start`, `complete`, `cancel`
-- insumos: `save`
-- colheita: `create`
-- estoque: `receive`, `consume`
-- financeiro: `addExpense`, `addIncome`
-- relatórios: `csv`, `issue`
-- configurações: `backup`, `restore`
+Implementado sobre a mesma arquitetura local-first, sem serviço externo obrigatório.
 
-A evidência `qa-artifacts/phase5-summary.json` registra ações declaradas, exercitadas, aprovadas, falhas e não testadas. A Fase 5 falha se qualquer ação contratada ficar sem execução ou sem auditoria de sucesso.
+### Capture
 
-### Release e certificação
+- captura ligada a entidade agrícola (`field`, operação etc.);
+- origem `camera`, `file` ou `manual`;
+- conteúdo persistido localmente por meio do serviço de arquivos;
+- controlado por feature flag.
 
-- `build:win` usa `--publish never`, impedindo publicação implícita e dependência de `GH_TOKEN`.
-- `npm run phase8:certify` é fail-closed: exige evidências `passed` de Fase 5, Fase 7 e Playwright vinculadas ao mesmo commit e um instalador Windows novo, maior que 1 MiB, com SHA-256 registrado.
-- `.github/workflows/p0-hardening.yml` executa regressão/compatibilidade no Linux e certificação sintética de release no Windows, publicando evidências e instalador como artefatos.
+### Files / upload
 
-## Verificação P0
+- anexos locais relacionados a entidade;
+- validação de nome contra traversal (`../`, barras e NUL);
+- base64 validado;
+- arquivo vazio rejeitado;
+- limite padrão de 10 MiB;
+- SHA-256 e tamanho persistidos;
+- download/listagem/remoção local.
 
-A suíte automatizada cobre, entre outros pontos:
+### PDF
 
-- rollback atômico de comando no SQLite;
-- rollback de comando na persistência da PWA;
-- liberação da fila transacional após falha de snapshot;
-- auditoria de tentativa/sucesso/falha;
-- continuidade do audit-log após restore;
-- RBAC e invariantes de domínio;
-- **17/17 ações funcionais** no Product QA;
-- navegação e UI via Playwright;
-- compatibilidade de persistência e migrations;
-- release Windows e certificação fail-closed.
+- ação `reports.pdf` integrada à camada existente `product-documents` / `artisys-pdf`;
+- geração local, sem API paga;
+- saída `application/pdf` em bytes.
 
-## Fases 5–8
+### Checklists
 
-- Fase 5: QA funcional completo da superfície contratada.
-- Fase 6: contrato e banco standalone validados.
-- Fase 7: cutover não destrutivo sobre cópia sandbox do banco indicado por `ARTISYS_LEGACY_DB`; o original permanece byte a byte inalterado e banco com WAL ativo é rejeitado.
-- Fase 8: certificação fail-closed do instalador e das evidências vinculadas ao commit.
+- checklist ligado a operação;
+- itens obrigatórios/opcionais;
+- atualização item a item;
+- conclusão bloqueada se item obrigatório estiver pendente;
+- flag opcional `checklists.enforceBeforeOperationComplete` pode exigir checklist concluído antes de concluir a operação (desligada por padrão para preservar compatibilidade).
 
-### Banco legado real
+### Catálogo agrícola
 
-Quando existir uma base legada real a preservar, a homologação adicional no Windows continua disponível:
+- catálogo persistente para `crop`, `input`, `operation-type`, `unit` e `category`;
+- busca local e filtro por tipo/ativo;
+- edição administrativa pela tela de configurações.
+
+### Feature flags
+
+Flags persistentes locais, com defaults seguros:
+
+- `capture.enabled`
+- `files.enabled`
+- `pdf.enabled`
+- `checklists.enabled`
+- `catalog.enabled`
+- `checklists.enforceBeforeOperationComplete`
+
+Feature flags não substituem RBAC: todas as ações continuam passando pela camada de segurança e pelo dispatcher de comandos.
+
+### Product QA P2
+
+`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, incluindo auditoria de sucesso. O contrato agregado é **37 ações**.
+
+Ações P2:
+
+- `overview.capture`
+- `fields.uploadFile`
+- `fields.removeFile`
+- `reports.pdf`
+- `operations.createChecklist`
+- `operations.setChecklistItem`
+- `operations.completeChecklist`
+- `settings.upsertCatalog`
+- `settings.setFeatureFlag`
+
+Testes negativos também cobrem upload inseguro, captura desabilitada, checklist obrigatório incompleto e catálogo inválido.
+
+## CI e release
+
+- workflows P0/P1/P2 usam `actions/checkout@v7` e `actions/setup-node@v7`;
+- Node de produto permanece 22;
+- `build:win` mantém `--publish never`;
+- P2 certifica Linux e Windows e publica evidências QA + instalador;
+- base legada de CI é sintética e não destrutiva;
+- não existe `package-lock.json` no baseline atual, portanto CI continua em `npm install`; migrar para `npm ci` depende primeiro de gerar e versionar um lockfile real validado.
+
+## Banco legado real
+
+Quando existir uma base legada real a preservar, a homologação adicional permanece disponível:
 
 ```powershell
 $env:ARTISYS_LEGACY_DB="C:\caminho\artisys-safras-talhoes.sqlite"; npm run release:certify
 ```
 
-Essa homologação é uma etapa de migração/cutover para instalações com dados antigos; não é dependência do P0 de código para uma instalação nova sem banco legado real.
+Essa homologação é uma etapa de migração/cutover para instalações com dados antigos; não é dependência para uma instalação nova.
 
-**Estado:** P0 de integridade concluído quando o workflow `P0 hardening` estiver verde no commit corrente, com Linux e Windows aprovados.
+## Critério de fechamento
+
+P0/P1/P2 só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo e instalador Windows gerado.

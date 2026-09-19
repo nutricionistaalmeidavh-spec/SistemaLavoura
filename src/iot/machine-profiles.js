@@ -1,0 +1,33 @@
+const text=(value,label)=>{if(typeof value!=='string'||!value.trim())throw new TypeError(`${label} is required.`);return value.trim();};
+const strings=(values,label)=>Object.freeze((values??[]).map(value=>text(value,label)));
+
+export function createMachineProfile({id,name,manufacturer=null,brands=[],categories=[],protocols=[],integrationStatus='generic-standard',modelCompatibility='verify-per-model',sourceRefs=[],notes=null}={}){
+  if(!Array.isArray(protocols)||!protocols.length)throw new TypeError('Machine profile protocols are required.');
+  if(modelCompatibility==='universal')throw new TypeError('Machine profiles may not claim universal model compatibility.');
+  return Object.freeze({id:text(id,'Machine profile id'),name:text(name,'Machine profile name'),manufacturer:manufacturer?text(manufacturer,'Manufacturer'):null,brands:strings(brands,'Brand'),categories:strings(categories,'Category'),protocols:strings(protocols,'Protocol'),integrationStatus:text(integrationStatus,'Integration status'),modelCompatibility:text(modelCompatibility,'Model compatibility'),sourceRefs:strings(sourceRefs,'Source reference'),notes:notes?text(notes,'Notes'):null});
+}
+
+const p=(value)=>createMachineProfile(value);
+export const DEFAULT_MACHINE_PROFILES=Object.freeze([
+  p({id:'generic-can',name:'Máquina agrícola CAN genérica',categories:['tractor','harvester','sprayer','implement'],protocols:['can'],integrationStatus:'generic-mapping',sourceRefs:['https://www.stara.com.br/noticias/departamento-de-rede/telemetria-stara-permite-integrar-informacoes-da-maquina-com-outros-softwares'],notes:'Exige mapeamento autorizado dos sinais do equipamento; não presume IDs proprietários.'}),
+  p({id:'generic-j1939',name:'Máquina agrícola J1939 genérica',categories:['tractor','harvester','sprayer','self-propelled'],protocols:['j1939'],integrationStatus:'generic-mapping',sourceRefs:['https://www.sae.org/standards/content/j1939_202505/'],notes:'O decoder é genérico; PGNs/SPNs devem vir de documentação licenciada ou fornecida pelo fabricante/cliente.'}),
+  p({id:'generic-isobus-tractor',name:'Trator ISOBUS genérico',categories:['tractor'],protocols:['isobus','isoxml'],integrationStatus:'generic-standard',sourceRefs:['https://www.aef-online.org/about-us/isobus.html','https://www.aef-online.org/products/aef-isobus-database.html'],notes:'Compatibilidade real depende das funcionalidades AEF certificadas do modelo.'}),
+  p({id:'generic-isobus-implement',name:'Implemento ISOBUS genérico',categories:['planter','sprayer','spreader','implement'],protocols:['isobus','isoxml'],integrationStatus:'generic-standard',sourceRefs:['https://www.aef-online.org/aef-tour/','https://www.aef-online.org/products/aef-isobus-database.html'],notes:'Usar a base AEF para verificar funcionalidades por produto antes de marcar como homologado.'}),
+  p({id:'generic-agrirouter',name:'Máquina via agrirouter',categories:['tractor','harvester','sprayer','implement'],protocols:['agrirouter','isoxml','isobus'],integrationStatus:'requires-user-account',sourceRefs:['https://agrirouter.com/en/docs','https://agrirouter.com/en/docs/message-types/efdi'],notes:'Suporta TaskData e EFDI conforme capacidades habilitadas na conta do usuário.'}),
+  p({id:'john-deere-operations-center',name:'John Deere Operations Center',manufacturer:'John Deere',brands:['John Deere'],categories:['tractor','harvester','sprayer','equipment'],protocols:['john-deere-operations-center','isobus','j1939'],integrationStatus:'official-api-auth-required',sourceRefs:['https://developer.deere.com/dev-docs/machine-device-state-reports','https://developer.deere.com/dev-docs/machine-hours-of-operation'],notes:'A API exige OAuth, escopos/permissões e acesso do cliente à organização/equipamento; recursos podem depender do plano/licença.'}),
+  p({id:'cnh-fieldops',name:'CNH FieldOps',manufacturer:'CNH',brands:['Case IH','New Holland','STEYR'],categories:['tractor','harvester','sprayer','equipment'],protocols:['cnh-fieldops','isobus','j1939'],integrationStatus:'official-api-auth-required',sourceRefs:['https://develop.cnh.com/api-guides/fieldops-api','https://develop.cnh.com/api-guides/fieldops-api/vehicle-telemetry'],notes:'Telemetria oficial FieldOps usa perfis CAN/Machine Health e endpoints baseados em ISO 15143-3; disponibilidade varia por veículo/sensores.'}),
+  p({id:'agco-agrirouter',name:'AGCO/Fendt via agrirouter',manufacturer:'AGCO',brands:['Fendt','Massey Ferguson','Valtra'],categories:['tractor','harvester','equipment'],protocols:['agrirouter','isobus','isoxml'],integrationStatus:'requires-user-account',sourceRefs:['https://www.fendt.com/br/smart-farming/fendtone','https://www.agcocorp.com/int/en/home/privacy-center/connected-product-data/connected-product-data-en'],notes:'Preferir agrirouter quando disponível; não presume uma API AGCO direta para todos os produtos.'}),
+  p({id:'stara-telemetry',name:'Stara Telemetria',manufacturer:'Stara',brands:['Stara'],categories:['tractor','sprayer','spreader','planter','equipment'],protocols:['can','stara-partner-api'],integrationStatus:'requires-partner-contract',sourceRefs:['https://www.stara.com.br/noticias/departamento-de-rede/telemetria-stara-permite-integrar-informacoes-da-maquina-com-outros-softwares'],notes:'A Stara documenta integração por CAN e API para softwares parceiros, mas o contrato técnico/API não é publicado como portal aberto.'}),
+  p({id:'jacto-ekos',name:'Jacto Next / EKOS',manufacturer:'Jacto',brands:['Jacto'],categories:['sprayer','equipment','multibrand'],protocols:['jacto-ekos-partner'],integrationStatus:'requires-partner-contract',sourceRefs:['https://blog.jacto.com.br/jacto-next/'],notes:'EKOS é multimarcas e integra máquinas/sensores/software; não foi encontrada especificação pública de API de desenvolvedor para hardcode no produto.'})
+]);
+
+export function createMachineProfileRegistry(profiles=DEFAULT_MACHINE_PROFILES){
+  const normalized=profiles.map(profile=>profile?.id&&Object.isFrozen(profile)?profile:createMachineProfile(profile));
+  const byId=new Map(normalized.map(profile=>[profile.id,profile]));
+  return Object.freeze({
+    get(id){return byId.get(id)??null;},
+    list(){return [...normalized];},
+    findByBrand(brand){const target=String(brand??'').trim().toLowerCase();return normalized.filter(profile=>profile.brands.some(value=>value.toLowerCase()===target)||profile.manufacturer?.toLowerCase()===target);},
+    findByProtocol(protocol){const target=String(protocol??'').trim().toLowerCase();return normalized.filter(profile=>profile.protocols.some(value=>value.toLowerCase()===target));}
+  });
+}

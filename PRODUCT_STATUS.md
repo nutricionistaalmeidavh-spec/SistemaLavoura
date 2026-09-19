@@ -18,13 +18,24 @@ Integrado na branch `migration/standalone-phase-0-8`.
 - `backup` e `restore` usam permissões explícitas e ficam restritos ao `admin` pela política atual.
 - writes de `fields`, `seasons`, `inputs` e `operationTypes` passam pelos validadores de domínio antes da persistência.
 - regressões específicas vivem em `tests/p0-hardening.test.js`.
-- `.github/workflows/p0-hardening.yml` prepara verificação Linux e certificação sintética Windows com upload das evidências e do instalador.
+- o checker standalone valida imports/requires reais sem confundir metadados de UX com dependência externa.
+- `build:win` usa `--publish never`, impedindo publicação implícita e exigência de `GH_TOKEN` em CI.
+- `.github/workflows/p0-hardening.yml` executa verificação Linux e certificação sintética Windows, publicando evidências e instalador como artefatos do GitHub Actions.
 
-Verificação isolada dos módulos alterados foi executada com Node 22 e passou. O GitHub ainda não registrou workflow runs após os pushes/merge desta alteração; portanto o CI hospedado não deve ser considerado homologado até existir uma execução real registrada pelo Actions.
+### Evidência automatizada
+
+O GitHub Actions `P0 hardening` foi executado com sucesso no commit `945f4162d74a9b6ae2eb7df9b63690e561e413a4`:
+
+- Linux: `phase5` passou, contrato de compatibilidade passou e evidências foram publicadas.
+- Windows: banco legado sintético foi criado, `release:certify` passou e o instalador Windows foi publicado como artefato.
+- suíte Node no Windows: **20 testes aprovados, 0 falhas**.
+- Playwright: **2 testes aprovados** nas execuções de certificação.
+
+Essa certificação automatizada usa banco legado sintético e não substitui a homologação final contra uma cópia real do banco legado de produção.
 
 ## Fases 5–6
 
-Implementadas em código. A homologação continua dependente de execução fresca no ambiente Windows.
+Implementadas e verificadas no CI sintético. A homologação comercial final continua dependente de execução contra banco legado real no Windows.
 
 ## Fase 7 — cutover não destrutivo
 
@@ -34,7 +45,7 @@ Implementada. `npm run phase7` trabalha exclusivamente sobre cópia sandbox do b
 
 Implementada. `npm run phase8:certify` exige evidências `passed` de Fase 5, Fase 7 e Playwright vinculadas ao mesmo commit, além de instalador `ArtiSys-Lavoura-Setup-*.exe` novo, maior que 1 MiB e com SHA-256 registrado.
 
-### Certificação final no Windows
+### Homologação final com banco real no Windows
 
 ```powershell
 $env:ARTISYS_LEGACY_DB="C:\caminho\artisys-safras-talhoes.sqlite"; npm run release:certify
@@ -46,4 +57,4 @@ Evidências esperadas:
 - `qa-artifacts/playwright-summary.json`
 - `qa-artifacts/release-certification.json`
 
-**Estado:** P0 de código integrado e Fases 0–8 implementadas; homologação real ainda requer execução fresca do comando acima contra banco legado real. Até certificação `passed`, `main` não deve ser promovida e o monorepo continua rollback/reference.
+**Estado:** P0 de código concluído e certificação sintética Linux/Windows aprovada. A promoção para `main` permanece bloqueada somente pela homologação contra banco legado real; o monorepo continua rollback/reference até essa evidência existir.

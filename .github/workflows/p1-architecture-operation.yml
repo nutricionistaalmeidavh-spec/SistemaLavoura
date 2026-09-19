@@ -1,16 +1,12 @@
-name: P0 hardening
+name: P1 architecture and operation
 
 on:
   push:
     branches:
-      - fix/p0-hardening
-      - fix/p0-finalize
-      - migration/standalone-phase-0-8
       - feature/p1-architecture-operation
       - main
   pull_request:
     branches:
-      - migration/standalone-phase-0-8
       - main
   workflow_dispatch:
 
@@ -18,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  regression:
-    name: Linux regression and compatibility
+  linux-p1:
+    name: Linux P1 regression
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,18 +24,17 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
-      - run: npm run phase5
-      - run: npm run compat:contract
-      - name: Upload Linux QA evidence
+      - run: npm run p1
+      - name: Upload Linux P1 QA evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p0-linux-qa
+          name: p1-linux-qa
           path: qa-artifacts/
           if-no-files-found: ignore
 
-  windows-certification:
-    name: Windows synthetic release certification
+  windows-p1:
+    name: Windows P1 release certification
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,17 +56,18 @@ jobs:
           node .\create-legacy-ci.mjs
           "ARTISYS_LEGACY_DB=$((Resolve-Path '.\legacy-ci.sqlite').Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - run: npm run release:certify
-      - name: Upload Windows QA evidence
+      - run: npm run qa:p1
+      - name: Upload Windows P1 QA evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p0-windows-qa
+          name: p1-windows-qa
           path: qa-artifacts/
           if-no-files-found: ignore
-      - name: Upload certified installer
+      - name: Upload P1 certified installer
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p0-windows-installer
+          name: p1-windows-installer
           path: release/*.exe
           if-no-files-found: ignore

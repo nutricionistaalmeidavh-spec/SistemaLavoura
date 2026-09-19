@@ -10,51 +10,77 @@
 - Dependência obrigatória paga: **nenhuma**
 - Operação: local-first / self-hosted
 
-## P0 hardening
+## P0 — integridade
 
-Integrado na branch `migration/standalone-phase-0-8`.
+O P0 cobre autenticação/RBAC, backup e recuperação, auditoria, QA, segurança, certificação de release e a fronteira transacional de comandos.
 
-- `settings` deixou de aceitar acesso genérico de qualquer sessão autenticada.
-- `backup` e `restore` usam permissões explícitas e ficam restritos ao `admin` pela política atual.
+### Segurança e RBAC
+
+- `settings`, `backup` e `restore` usam permissões explícitas; pela política atual ficam restritos ao `admin`.
 - writes de `fields`, `seasons`, `inputs` e `operationTypes` passam pelos validadores de domínio antes da persistência.
-- regressões específicas vivem em `tests/p0-hardening.test.js`.
-- o checker standalone valida imports/requires reais sem confundir metadados de UX com dependência externa.
-- `build:win` usa `--publish never`, impedindo publicação implícita e exigência de `GH_TOKEN` em CI.
-- `.github/workflows/p0-hardening.yml` executa verificação Linux e certificação sintética Windows, publicando evidências e instalador como artefatos do GitHub Actions.
+- regressões de autorização e validação são executadas pela suíte automatizada.
 
-### Evidência automatizada
+### Comandos, transações e auditoria
 
-O GitHub Actions `P0 hardening` foi executado com sucesso no commit `945f4162d74a9b6ae2eb7df9b63690e561e413a4`:
+- todas as ações de negócio expostas pelo backend passam por `runtime/commands.mjs`.
+- cada comando registra auditoria de `attempt`, `success` ou `failure`, com `commandId` e contexto da ação.
+- comandos persistentes no desktop executam em uma única transação SQLite, com rollback integral em falha e suporte seguro a operações de persistência aninhadas.
+- a persistência da PWA usa snapshot/rollback local e serialização de comandos; falhas ao criar o snapshot não bloqueiam a fila seguinte.
+- `reports.csv`, `settings.backup` e `settings.restore` ficam fora da transação de negócio por serem, respectivamente, leitura ou operações de recuperação que quiescem/substituem o banco.
+- restore preserva registros de auditoria criados depois do backup escolhido, tanto no SQLite quanto no armazenamento local do navegador.
 
-- Linux: `phase5` passou, contrato de compatibilidade passou e evidências foram publicadas.
-- Windows: banco legado sintético foi criado, `release:certify` passou e o instalador Windows foi publicado como artefato.
-- suíte Node no Windows: **20 testes aprovados, 0 falhas**.
-- Playwright: **2 testes aprovados** nas execuções de certificação.
+### Product QA
 
-Essa certificação automatizada usa banco legado sintético e não substitui a homologação final contra uma cópia real do banco legado de produção.
+A Fase 5 não valida apenas a existência da superfície. Ela executa funcionalmente as **17/17 ações contratadas** pelo mesmo backend usado pelo produto:
 
-## Fases 5–6
+- talhões: `save`, `remove`
+- safras: `save`
+- operações: `schedule`, `start`, `complete`, `cancel`
+- insumos: `save`
+- colheita: `create`
+- estoque: `receive`, `consume`
+- financeiro: `addExpense`, `addIncome`
+- relatórios: `csv`, `issue`
+- configurações: `backup`, `restore`
 
-Implementadas e verificadas no CI sintético. A homologação comercial final continua dependente de execução contra banco legado real no Windows.
+A evidência `qa-artifacts/phase5-summary.json` registra ações declaradas, exercitadas, aprovadas, falhas e não testadas. A Fase 5 falha se qualquer ação contratada ficar sem execução ou sem auditoria de sucesso.
 
-## Fase 7 — cutover não destrutivo
+### Release e certificação
 
-Implementada. `npm run phase7` trabalha exclusivamente sobre cópia sandbox do banco indicado por `ARTISYS_LEGACY_DB`, valida migration, escrita/reabertura, backup/restore, preservação lógica das tabelas existentes e SHA-256 inalterado do arquivo original. Banco com WAL ativo é rejeitado.
+- `build:win` usa `--publish never`, impedindo publicação implícita e dependência de `GH_TOKEN`.
+- `npm run phase8:certify` é fail-closed: exige evidências `passed` de Fase 5, Fase 7 e Playwright vinculadas ao mesmo commit e um instalador Windows novo, maior que 1 MiB, com SHA-256 registrado.
+- `.github/workflows/p0-hardening.yml` executa regressão/compatibilidade no Linux e certificação sintética de release no Windows, publicando evidências e instalador como artefatos.
 
-## Fase 8 — certificação fail-closed
+## Verificação P0
 
-Implementada. `npm run phase8:certify` exige evidências `passed` de Fase 5, Fase 7 e Playwright vinculadas ao mesmo commit, além de instalador `ArtiSys-Lavoura-Setup-*.exe` novo, maior que 1 MiB e com SHA-256 registrado.
+A suíte automatizada cobre, entre outros pontos:
 
-### Homologação final com banco real no Windows
+- rollback atômico de comando no SQLite;
+- rollback de comando na persistência da PWA;
+- liberação da fila transacional após falha de snapshot;
+- auditoria de tentativa/sucesso/falha;
+- continuidade do audit-log após restore;
+- RBAC e invariantes de domínio;
+- **17/17 ações funcionais** no Product QA;
+- navegação e UI via Playwright;
+- compatibilidade de persistência e migrations;
+- release Windows e certificação fail-closed.
+
+## Fases 5–8
+
+- Fase 5: QA funcional completo da superfície contratada.
+- Fase 6: contrato e banco standalone validados.
+- Fase 7: cutover não destrutivo sobre cópia sandbox do banco indicado por `ARTISYS_LEGACY_DB`; o original permanece byte a byte inalterado e banco com WAL ativo é rejeitado.
+- Fase 8: certificação fail-closed do instalador e das evidências vinculadas ao commit.
+
+### Banco legado real
+
+Quando existir uma base legada real a preservar, a homologação adicional no Windows continua disponível:
 
 ```powershell
 $env:ARTISYS_LEGACY_DB="C:\caminho\artisys-safras-talhoes.sqlite"; npm run release:certify
 ```
 
-Evidências esperadas:
-- `qa-artifacts/phase5-summary.json`
-- `qa-artifacts/phase7-summary.json`
-- `qa-artifacts/playwright-summary.json`
-- `qa-artifacts/release-certification.json`
+Essa homologação é uma etapa de migração/cutover para instalações com dados antigos; não é dependência do P0 de código para uma instalação nova sem banco legado real.
 
-**Estado:** P0 de código concluído e certificação sintética Linux/Windows aprovada. A promoção para `main` permanece bloqueada somente pela homologação contra banco legado real; o monorepo continua rollback/reference até essa evidência existir.
+**Estado:** P0 de integridade concluído quando o workflow `P0 hardening` estiver verde no commit corrente, com Linux e Windows aprovados.

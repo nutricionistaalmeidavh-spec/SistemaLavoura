@@ -35,6 +35,20 @@ function configFromRow(row){
     secretRef:row.secret_ref??null,updatedAt:row.updated_at
   });
 }
+function commandFromRow(row){
+  return Object.freeze({
+    id:row.id,
+    deviceId:row.device_id,
+    command:row.command,
+    payload:Object.freeze(parseJson(row.payload_json,{})),
+    requestedBy:row.requested_by,
+    requestedAt:row.requested_at,
+    expiresAt:row.expires_at,
+    status:row.status,
+    acknowledgedAt:row.acknowledged_at??null,
+    failureReason:row.failure_reason??null
+  });
+}
 
 export function createIoTRepository(database){
   const db=assertDb(database);
@@ -58,6 +72,14 @@ export function createIoTRepository(database){
     VALUES(?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET protocol=excluded.protocol,enabled=excluded.enabled,config_json=excluded.config_json,
       secret_ref=excluded.secret_ref,updated_at=excluded.updated_at`);
+  const saveCommandStmt=db.prepare(`
+    INSERT INTO iot_commands(id,device_id,command,payload_json,requested_by,requested_at,expires_at,status,acknowledged_at,failure_reason)
+    VALUES(?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET
+      device_id=excluded.device_id,command=excluded.command,payload_json=excluded.payload_json,
+      requested_by=excluded.requested_by,requested_at=excluded.requested_at,expires_at=excluded.expires_at,
+      status=excluded.status,acknowledged_at=excluded.acknowledged_at,failure_reason=excluded.failure_reason`);
+  const getCommandStmt=db.prepare('SELECT * FROM iot_commands WHERE id=?');
 
   return Object.freeze({
     saveDevice(device){
@@ -98,6 +120,25 @@ export function createIoTRepository(database){
       saveConfigStmt.run(config.id,config.protocol,config.enabled?1:0,stringify(config.config),config.secretRef??null,config.updatedAt);
       return config;
     },
-    listAdapterConfigs(){return db.prepare('SELECT * FROM iot_adapter_configs ORDER BY id').all().map(configFromRow);}
+    listAdapterConfigs(){return db.prepare('SELECT * FROM iot_adapter_configs ORDER BY id').all().map(configFromRow);},
+    saveCommand(command){
+      saveCommandStmt.run(
+        command.id,command.deviceId,command.command,stringify(command.payload),command.requestedBy,
+        command.requestedAt,command.expiresAt,command.status,command.acknowledgedAt??null,command.failureReason??null
+      );
+      return command;
+    },
+    getCommand(id){
+      const row=getCommandStmt.get(id);
+      return row?commandFromRow(row):null;
+    },
+    listCommands({deviceId=null,status=null,limit=100}={}){
+      const safeLimit=Math.max(1,Math.min(1000,Number.isInteger(limit)?limit:100));
+      const clauses=[],args=[];
+      if(deviceId){clauses.push('device_id=?');args.push(deviceId);}
+      if(status){clauses.push('status=?');args.push(status);}
+      const where=clauses.length?` WHERE ${clauses.join(' AND ')}`:'';
+      return db.prepare(`SELECT * FROM iot_commands${where} ORDER BY requested_at DESC,id DESC LIMIT ?`).all(...args,safeLimit).map(commandFromRow);
+    }
   });
 }

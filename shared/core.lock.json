@@ -2,12 +2,14 @@
   "schemaVersion": 1,
   "sourceRepository": "nutricionistaalmeidavh-spec/SistemasNichadosAgroFrota",
   "sourceCommit": "a95bd0176ad4053276c5588d3170d18fe5c24c8e",
-  "strategy": "pinned-migration-snapshot",
+  "strategy": "pinned-migration-snapshot-plus-local-product-modules",
   "packages": [
     "domain-finance",
     "product-documents",
+    "product-eventbus",
     "product-inventory",
     "product-security",
+    "product-settings",
     "ui-shell",
     "vertical-persistence"
   ],
@@ -18,6 +20,14 @@
     "artisys-pdf",
     "artisys-reporting",
     "artisys-storage"
+  ],
+  "productLocalModules": [
+    "capture",
+    "files-upload",
+    "checklists",
+    "agricultural-catalog",
+    "feature-flags",
+    "agricultural-pdf"
   ],
   "requiredPaidServices": []
 }

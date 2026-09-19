@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/p1-architecture-operation
+      - feature/p2-product-agricola
       - main
   pull_request:
     branches:
@@ -18,10 +19,11 @@ jobs:
     name: Linux P1 regression
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
+          package-manager-cache: false
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: npm run p1
@@ -37,10 +39,11 @@ jobs:
     name: Windows P1 release certification
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
+          package-manager-cache: false
       - run: npm install --no-audit --no-fund
       - run: npx playwright install chromium
       - name: Create non-destructive synthetic legacy database

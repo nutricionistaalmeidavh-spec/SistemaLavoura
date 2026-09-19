@@ -1,9 +1,12 @@
+import {createCommandDispatcher} from './commands.mjs';
+
 const credentials=(auth={})=>({sessionId:auth.sessionId,token:auth.token});
 const cleanScreen=(screen)=>({id:screen.id,title:screen.title,kind:screen.kind,actionDefinitions:screen.actionDefinitions??{}});
 
 export function createRpcBackend({presentation}){
   if(!presentation?.screen||!presentation?.services?.security)throw new TypeError('Functional presentation with security is required.');
   const security=presentation.services.security;
+  const commands=createCommandDispatcher({presentation});
   async function requireSession(auth,permission=null){
     const c=credentials(auth);
     if(permission)return security.authorize({...c,permission});
@@ -18,6 +21,6 @@ export function createRpcBackend({presentation}){
     async validate(auth){return requireSession(auth);},
     async logout(auth){return security.revoke(credentials(auth));},
     async load({screenId,auth,context={}}={}){await requireSession(auth,permissionFor(screenId,'read'));return presentation.load(screenId,context);},
-    async action({screenId,action,input={},auth,context={}}={}){await requireSession(auth,permissionFor(screenId,'write',action));return presentation.action(screenId,action,input,context);}
+    async action({screenId,action,input={},auth,context={}}={}){return commands.execute({screenId,action,input,auth,context});}
   });
 }

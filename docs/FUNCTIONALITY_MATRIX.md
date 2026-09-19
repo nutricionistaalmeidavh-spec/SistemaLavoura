@@ -1,6 +1,6 @@
 # Functionality matrix — ArtiSys Lavoura
 
-Inventário da superfície publicada pelo `presentation.js` no baseline congelado.
+Inventário da superfície publicada pelo `presentation.js` no baseline standalone.
 
 | Tela | Funcionalidades expostas |
 |---|---|
@@ -15,4 +15,6 @@ Inventário da superfície publicada pelo `presentation.js` no baseline congelad
 | Relatórios (`reports`) | `csv`, `issue` |
 | Configurações (`settings`) | `backup`, `restore` |
 
-Total no contrato atual: **10 telas** e **17 ações de usuário**. O inventário é referência de migração; homologação completa exige testes de execução e UI separados.
+Total no contrato atual: **10 telas** e **17 ações de usuário**.
+
+O `tooling/qa-phase5.mjs` executa funcionalmente as **17/17 ações** através do backend/RPC, exige auditoria de sucesso para cada ação e publica cobertura em `qa-artifacts/phase5-summary.json`. A camada visual é verificada separadamente pelos testes Playwright.

@@ -65,5 +65,5 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
     }
   };
 
-  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery } });
+  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery, persistence } });
 }

@@ -49,8 +49,8 @@ test('configurações expõe preferências, backup, importação e catálogo por
   await enter(page,'Settings-Form-2026!');
   await page.getByTestId('nav-settings').click();
   await expect(page.getByTestId('settings-workspace')).toBeVisible();
-  await expect(page.getByText('Preferências')).toBeVisible();
-  await expect(page.getByText('Backups locais')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Importar CSV'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Novo item'})).toBeVisible();
+  await expect(page.getByText('Preferências',{exact:true})).toBeVisible();
+  await expect(page.getByText('Backups locais',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Importar CSV',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Novo item',exact:true})).toBeVisible();
 });

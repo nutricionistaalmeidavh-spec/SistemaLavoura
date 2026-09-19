@@ -10,7 +10,11 @@ export function createRestTelemetryAdapter({id='rest-machine-api',protocol='rest
   if(typeof recordSelector!=='function')throw new TypeError('REST telemetry recordSelector must be a function.');
   if(!Array.isArray(mappings)||!mappings.length)throw new TypeError('REST telemetry mappings are required.');
   const adapterId=text(id,'REST adapter id'),adapterProtocol=text(protocol,'REST adapter protocol'),resourceUrl=text(config.resourceUrl,'REST resourceUrl');
-  const normalized=mappings.map((mapping,index)=>{if(!mapping||typeof mapping!=='object')throw new TypeError(`REST mapping ${index} is invalid.`);return Object.freeze({...mapping,deviceId:text(mapping.deviceId,'Device id'),metric:text(mapping.metric,'Metric'),unit:text(mapping.unit,'Unit')});});
+  const normalized=mappings.map((mapping,index)=>{
+    if(!mapping||typeof mapping!=='object')throw new TypeError(`REST mapping ${index} is invalid.`);
+    const deviceId=typeof mapping.deviceId==='function'?mapping.deviceId:text(mapping.deviceId,'Device id');
+    return Object.freeze({...mapping,deviceId,metric:text(mapping.metric,'Metric'),unit:text(mapping.unit,'Unit')});
+  });
   const handlers=new Set();let started=false,polls=0,records=0,lastError=null;
   const resolve=(definition,record)=>typeof definition==='function'?definition(record):getPath(record,definition);
   const adapter={

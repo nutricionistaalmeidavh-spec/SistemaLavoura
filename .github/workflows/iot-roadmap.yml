@@ -1,0 +1,27 @@
+name: IoT roadmap
+
+on:
+  push:
+    branches:
+      - roadmap/iot-ready
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  iot-contracts:
+    name: IoT contracts and regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: IoT tests
+        run: node --test tests/iot-*.test.js
+      - name: Product tests
+        run: npm test
+      - name: Compatibility contract
+        run: npm run compat:contract

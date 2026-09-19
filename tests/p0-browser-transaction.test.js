@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MemoryStorage} from '../shared/vendor/release-modules/artisys-storage/src/browser.mjs';
-import {createBrowserPersistence} from '../shared/packages/vertical-persistence/src/browser.js';
+import {createBrowserPersistence,createBrowserRecovery} from '../shared/packages/vertical-persistence/src/browser.js';
 
 test('browser command transaction restores the previous snapshot on failure',async()=>{
   const persistence=createBrowserPersistence({productId:'agro-lavoura',storage:new MemoryStorage()});
@@ -17,5 +17,19 @@ test('browser command transaction restores the previous snapshot on failure',asy
     );
     assert.equal(await persistence.getRecord('qa.browser','first'),null);
     assert.equal(await persistence.getRecord('qa.browser','second'),null);
+  }finally{await persistence.close();}
+});
+
+test('browser restore keeps audit entries created after the selected backup',async()=>{
+  const persistence=createBrowserPersistence({productId:'agro-lavoura',storage:new MemoryStorage()});
+  const recovery=createBrowserRecovery(persistence,{productId:'agro-lavoura'});
+  try{
+    const collection='security-audit:agro-lavoura';
+    await persistence.putRecord(collection,'audit-before',{id:'audit-before',action:'before'},{expectedVersion:0});
+    await recovery.createBackup({id:'baseline'});
+    await persistence.putRecord(collection,'audit-after',{id:'audit-after',action:'after'},{expectedVersion:0});
+    await recovery.restoreBackup('baseline');
+    assert.ok(await persistence.getRecord(collection,'audit-before'));
+    assert.ok(await persistence.getRecord(collection,'audit-after'));
   }finally{await persistence.close();}
 });

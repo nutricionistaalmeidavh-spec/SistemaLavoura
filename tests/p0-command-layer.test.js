@@ -53,3 +53,17 @@ test('business actions are audited as command attempt and success or failure',as
   assert.equal(success[0].entityType,'fields');
   assert.equal(success[0].entityId,'field-audit');
 }));
+
+test('restore keeps audit entries created after the selected backup',async()=>withHost(async host=>{
+  const auth=await adminSession(host);
+  const backup=await host.backend.action({screenId:'settings',action:'backup',auth,input:{id:'audit-baseline'}});
+  await host.backend.action({
+    screenId:'fields',action:'save',auth,
+    input:{id:'field-after-backup',code:'AUD-02',name:'Talhão Pós Backup',farmUnitId:'farm-1',areaHa:8}
+  });
+  await host.backend.action({screenId:'settings',action:'restore',auth,input:{id:backup.id}});
+  const security=host.presentation.services.security;
+  assert.equal((await security.listAudit({...auth,action:'fields.save:success'})).length,1);
+  assert.equal((await security.listAudit({...auth,action:'settings.restore:attempt'})).length,1);
+  assert.equal((await security.listAudit({...auth,action:'settings.restore:success'})).length,1);
+}));

@@ -5,6 +5,7 @@ import {createAgroLavouraPresentation} from '../src/presentation.js';
 import {createRpcBackend} from '../runtime/backend.mjs';
 import {LavouraProductRuntime} from './ui/runtime.jsx';
 import './styles.css';
+import './product-workspaces.css';
 
 async function resolveBackend(){
   if(globalThis.artisys)return globalThis.artisys;

@@ -4,12 +4,13 @@
 
 - Produto: `agro-lavoura`
 - Banco: `artisys-safras-talhoes.sqlite`
-- Migration obrigatória: `agro-lavoura/001-initial.sql`
+- Migrations atuais: `agro-lavoura/001-initial.sql` + `agro-lavoura/002-iot.sql`
 - Telas contratadas: **10**
 - Ações funcionais contratadas: **37** (**17 P0 + 11 P1 + 9 P2**)
 - Dependência obrigatória paga: **nenhuma**
 - Operação: **local-first / self-hosted**
 - Targets: desktop Electron + PWA/web
+- IoT: camada opcional pronta para integração, sem custo recorrente obrigatório do produto
 
 ## P0 — integridade
 
@@ -39,82 +40,76 @@ Concluído. Adiciona **12 módulos** e **11 ações funcionais**:
 
 ## P2 — produto agrícola
 
-Implementado sobre a mesma arquitetura local-first, sem serviço externo obrigatório.
+Concluído sobre a mesma arquitetura local-first, sem serviço externo obrigatório.
 
-### Capture
+- Capture ligado a entidades agrícolas e controlado por feature flag.
+- Arquivos locais com validação de nome, limite padrão de 10 MiB, SHA-256, listagem/download/remoção.
+- PDF local integrado a `product-documents` / `artisys-pdf`.
+- Checklists ligados a operações, com itens obrigatórios e bloqueio opcional antes da conclusão.
+- Catálogo persistente para `crop`, `input`, `operation-type`, `unit` e `category`.
+- Feature flags locais para capture, files, PDF, checklists e catálogo.
 
-- captura ligada a entidade agrícola (`field`, operação etc.);
-- origem `camera`, `file` ou `manual`;
-- conteúdo persistido localmente por meio do serviço de arquivos;
-- controlado por feature flag.
+`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, preservando P0/P1. O contrato agregado permanece **37 ações**.
 
-### Files / upload
+## UI Productization
 
-- anexos locais relacionados a entidade;
-- validação de nome contra traversal (`../`, barras e NUL);
-- base64 validado;
-- arquivo vazio rejeitado;
-- limite padrão de 10 MiB;
-- SHA-256 e tamanho persistidos;
-- download/listagem/remoção local.
+### UI-0 → UI-3
 
-### PDF
+Concluídas:
 
-- ação `reports.pdf` integrada à camada existente `product-documents` / `artisys-pdf`;
-- geração local, sem API paga;
-- saída `application/pdf` em bytes.
+- design system Lavoura;
+- shell/navegação agrupada;
+- Product Runtime por `screen.kind`;
+- dashboard especializado baseado apenas em dados reais.
 
-### Checklists
+### UI-4 → UI-10
 
-- checklist ligado a operação;
-- itens obrigatórios/opcionais;
-- atualização item a item;
-- conclusão bloqueada se item obrigatório estiver pendente;
-- flag opcional `checklists.enforceBeforeOperationComplete` pode exigir checklist concluído antes de concluir a operação (desligada por padrão para preservar compatibilidade).
+Implementadas com workspaces especializados para todas as áreas da navegação:
 
-### Catálogo agrícola
+- UI-4: Talhões;
+- UI-5: formulários estruturados e remoção do editor JSON;
+- UI-6: dialogs/confirmations;
+- UI-7: Safras e Operações;
+- UI-8: Estoque;
+- UI-9: Financeiro;
+- UI-10: Relatórios.
 
-- catálogo persistente para `crop`, `input`, `operation-type`, `unit` e `category`;
-- busca local e filtro por tipo/ativo;
-- edição administrativa pela tela de configurações.
+Também foram productizadas, para cumprir o requisito de **zero interface técnica JSON**:
 
-### Feature flags
+- Insumos;
+- Colheita;
+- Configurações.
 
-Flags persistentes locais, com defaults seguros:
+A camada React permanece somente de apresentação: ações continuam passando pelo mesmo backend, dispatcher, RBAC, auditoria e transações já certificados.
 
-- `capture.enabled`
-- `files.enabled`
-- `pdf.enabled`
-- `checklists.enabled`
-- `catalog.enabled`
-- `checklists.enforceBeforeOperationComplete`
+## UX atual
 
-Feature flags não substituem RBAC: todas as ações continuam passando pela camada de segurança e pelo dispatcher de comandos.
+As 10 telas da navegação agora possuem renderização especializada:
 
-### Product QA P2
+1. Dashboard
+2. Talhões
+3. Safras
+4. Operações
+5. Insumos
+6. Colheita
+7. Estoque
+8. Financeiro
+9. Relatórios
+10. Configurações
 
-`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, incluindo auditoria de sucesso. O contrato agregado é **37 ações**.
+Não existe mais `ActionPanel`, `action-json` ou campo `JSON de entrada` na experiência de usuário. Os fluxos E2E passam a cadastrar e operar por formulários humanos.
 
-Ações P2:
+## IoT-ready
 
-- `overview.capture`
-- `fields.uploadFile`
-- `fields.removeFile`
-- `reports.pdf`
-- `operations.createChecklist`
-- `operations.setChecklistItem`
-- `operations.completeChecklist`
-- `settings.upsertCatalog`
-- `settings.setFeatureFlag`
-
-Testes negativos também cobrem upload inseguro, captura desabilitada, checklist obrigatório incompleto e catálogo inválido.
+A migration `002-iot.sql` e a camada `src/iot/` preservam a preparação para integrações opcionais como MQTT, Modbus, LoRaWAN, CAN/J1939, ISOBUS/ISOXML, agrirouter e APIs REST de fornecedores. O núcleo do produto não depende dessas integrações para funcionar e comandos físicos permanecem desativados por padrão.
 
 ## CI e release
 
 - workflows P0/P1/P2 usam `actions/checkout@v7` e `actions/setup-node@v7`;
 - Node de produto permanece 22;
 - `build:win` mantém `--publish never`;
-- P2 certifica Linux e Windows e publica evidências QA + instalador;
+- Linux executa testes, build web, QA funcional e Playwright;
+- Windows executa certificação de release e gera instalador;
 - base legada de CI é sintética e não destrutiva;
 - não existe `package-lock.json` no baseline atual, portanto CI continua em `npm install`; migrar para `npm ci` depende primeiro de gerar e versionar um lockfile real validado.
 
@@ -130,4 +125,4 @@ Essa homologação é uma etapa de migração/cutover para instalações com dad
 
 ## Critério de fechamento
 
-P0/P1/P2 só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo e instalador Windows gerado.
+P0/P1/P2 e a productização UI só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo, Playwright aprovado e instalador Windows gerado.

@@ -6,6 +6,7 @@ on:
       - fix/p0-hardening
       - fix/p0-finalize
       - migration/standalone-phase-0-8
+      - feature/p1-architecture-operation
       - main
   pull_request:
     branches:

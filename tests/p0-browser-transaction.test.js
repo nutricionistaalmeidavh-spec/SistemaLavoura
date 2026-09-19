@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import {MemoryStorage} from '../shared/vendor/release-modules/artisys-storage/src/browser.mjs';
 import {createBrowserPersistence,createBrowserRecovery} from '../shared/packages/vertical-persistence/src/browser.js';
 
+class FlakySnapshotStorage extends MemoryStorage{
+  failNextList=true;
+  async list(prefix=''){
+    if(this.failNextList){this.failNextList=false;throw new Error('snapshot failed');}
+    return super.list(prefix);
+  }
+}
+
 test('browser command transaction restores the previous snapshot on failure',async()=>{
   const persistence=createBrowserPersistence({productId:'agro-lavoura',storage:new MemoryStorage()});
   try{
@@ -17,6 +25,19 @@ test('browser command transaction restores the previous snapshot on failure',asy
     );
     assert.equal(await persistence.getRecord('qa.browser','first'),null);
     assert.equal(await persistence.getRecord('qa.browser','second'),null);
+  }finally{await persistence.close();}
+});
+
+test('browser transaction queue is released when snapshot creation fails',async()=>{
+  const persistence=createBrowserPersistence({productId:'agro-lavoura',storage:new FlakySnapshotStorage()});
+  try{
+    await assert.rejects(persistence.runInTransaction(async()=>{}),/snapshot failed/);
+    const second=persistence.runInTransaction(async()=>persistence.putRecord('qa.browser','after-failure',{value:1},{expectedVersion:0}));
+    await Promise.race([
+      second,
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('transaction queue stuck')),250))
+    ]);
+    assert.ok(await persistence.getRecord('qa.browser','after-failure'));
   }finally{await persistence.close();}
 });
 

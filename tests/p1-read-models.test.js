@@ -47,7 +47,7 @@ test('financial fingerprint is deterministic and normalized',()=>{
   const b={...a,description:'adubo café'};
   assert.equal(financialEntryFingerprint(a),financialEntryFingerprint(b));
   assert.match(financialEntryFingerprint(a),/^[0-9a-f]{16}$/);
-}));
+});
 
 test('dashboard aggregates fields operations harvest finance alerts inventory and planning',async()=>{
   const snapshot=await buildDashboardSnapshot({

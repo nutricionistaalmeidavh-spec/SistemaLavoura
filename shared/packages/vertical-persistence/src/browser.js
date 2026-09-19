@@ -40,8 +40,10 @@ export function createBrowserPersistence({storage=null,indexedDB=globalThis.inde
       const previous=transactionTail;
       transactionTail=previous.then(()=>gate);
       await previous;
-      const snapshot=await api.exportSnapshot();
-      try{return await work(api);}catch(error){await api.importSnapshot(snapshot,{clear:true});throw error;}finally{release();}
+      try{
+        const snapshot=await api.exportSnapshot();
+        try{return await work(api);}catch(error){await api.importSnapshot(snapshot,{clear:true});throw error;}
+      }finally{release();}
     },
     async schemaState(){return Object.freeze({driver:'browser-storage',productId:pid,migrations:Object.freeze([])});},
     async health(){ensureOpen();const state=await scoped.health?.();return Object.freeze({ok:state?.ok!==false,driver:state?.driver??'browser-storage',productId:pid});},

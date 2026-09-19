@@ -1,0 +1,73 @@
+name: P0 hardening
+
+on:
+  push:
+    branches:
+      - fix/p0-hardening
+      - migration/standalone-phase-0-8
+  pull_request:
+    branches:
+      - migration/standalone-phase-0-8
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Linux regression and compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run phase5
+      - run: npm run compat:contract
+      - name: Upload Linux QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-linux-qa
+          path: qa-artifacts/
+          if-no-files-found: ignore
+
+  windows-certification:
+    name: Windows synthetic release certification
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install chromium
+      - name: Create non-destructive synthetic legacy database
+        shell: pwsh
+        run: |
+          @'
+          import { DatabaseSync } from 'node:sqlite';
+          const db = new DatabaseSync('legacy-ci.sqlite');
+          db.exec('CREATE TABLE customer_data(id TEXT PRIMARY KEY,value TEXT);');
+          db.prepare('INSERT INTO customer_data VALUES(?,?)').run('legacy-ci','preserve-me');
+          db.close();
+          '@ | Set-Content -Encoding utf8 .\create-legacy-ci.mjs
+          node .\create-legacy-ci.mjs
+          "ARTISYS_LEGACY_DB=$((Resolve-Path '.\legacy-ci.sqlite').Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - run: npm run release:certify
+      - name: Upload Windows QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-windows-qa
+          path: qa-artifacts/
+          if-no-files-found: ignore
+      - name: Upload certified installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-windows-installer
+          path: release/*.exe
+          if-no-files-found: ignore

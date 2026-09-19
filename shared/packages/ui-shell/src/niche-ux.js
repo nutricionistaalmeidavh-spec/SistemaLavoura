@@ -1,0 +1,7 @@
+const step=(label,statuses=[])=>Object.freeze({label,statuses:Object.freeze(statuses)});
+const schedule=(sourceKeys,startKeys,titleKeys)=>Object.freeze({sourceKeys:Object.freeze(sourceKeys),startKeys:Object.freeze(startKeys),titleKeys:Object.freeze(titleKeys)});
+const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+export const COMMERCIAL_UX_PROFILES=Object.freeze({'agro-lavoura':Object.freeze({operations:Object.freeze({queueTitle:'Operações de campo',schedule:schedule(['rows'],['scheduledAt','startedAt','date'],['title','operationType','fieldId','id']),steps:Object.freeze([step('Programada',['scheduled','planned']),step('Em execução',['in-progress','started']),step('Concluída',['completed']),step('Cancelada',['cancelled'])])}),fields:Object.freeze({detailTitle:'Detalhes do talhão'})})});
+export const COMMERCIAL_UX_PROFILE_IDS=Object.freeze(Object.keys(COMMERCIAL_UX_PROFILES));
+export function commercialUxProductId(shell={}){const source=normalize([shell?.brand?.name,shell?.brand?.productName,shell?.brand?.visualDirection].filter(Boolean).join(' '));if(/safra|talhao|talhoes|lavoura|crop/.test(source))return 'agro-lavoura';return null;}
+export function nicheUxForScreen(shell,screenId){const productId=commercialUxProductId(shell);if(!productId)return null;return COMMERCIAL_UX_PROFILES[productId]?.[screenId]??null;}

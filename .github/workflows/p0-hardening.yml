@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/p0-hardening
+      - migration/standalone-phase-0-8
   pull_request:
     branches:
       - migration/standalone-phase-0-8

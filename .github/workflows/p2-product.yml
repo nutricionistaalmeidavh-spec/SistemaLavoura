@@ -1,0 +1,63 @@
+name: P2 agricultural product
+
+on:
+  push:
+    branches:
+      - feature/p2-product-agricola
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-p2:
+    name: Linux P2 regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run p2
+      - name: Upload Linux P2 QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-linux-qa
+          path: qa-artifacts/
+
+  windows-p2:
+    name: Windows P2 release certification
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install chromium
+      - name: Create non-destructive synthetic legacy database
+        shell: pwsh
+        run: |
+          node tooling/create-legacy-fixture.mjs
+          $env:ARTISYS_LEGACY_DB = (Resolve-Path qa-artifacts/legacy/artisys-safras-talhoes.sqlite).Path
+          "ARTISYS_LEGACY_DB=$env:ARTISYS_LEGACY_DB" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - run: npm run release:certify
+      - run: npm run qa:p2
+      - name: Upload Windows P2 QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-windows-qa
+          path: qa-artifacts/
+      - name: Upload P2 certified installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-windows-installer
+          path: release/*.exe

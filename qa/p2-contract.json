@@ -1,0 +1,15 @@
+{
+  "productId": "agro-lavoura",
+  "modules": ["capture", "files", "upload", "pdf", "checklists", "catalog", "feature-flags"],
+  "actions": {
+    "overview": ["capture"],
+    "fields": ["uploadFile", "removeFile"],
+    "reports": ["pdf"],
+    "operations": ["createChecklist", "setChecklistItem", "completeChecklist"],
+    "settings": ["upsertCatalog", "setFeatureFlag"]
+  },
+  "p0ActionContract": 17,
+  "p1ActionContract": 11,
+  "p2ActionContract": 9,
+  "totalActionContract": 37
+}

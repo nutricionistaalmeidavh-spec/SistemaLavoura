@@ -1,37 +1,38 @@
 # Dependency inventory — ArtiSys Lavoura
 
-## Dependências internas observadas
+## Core interno efetivamente incorporado
 
 - `ui-shell`
 - `vertical-persistence`
 - `domain-finance`
 - `product-documents`
+- `product-eventbus`
 - `product-inventory`
 - `product-security`
-- `domain-agro-core` consta no package original e deve permanecer rastreado até a poda final de dependências.
+- `product-settings`
 
-## Módulos `utilidades` do manifesto
-
-Obrigatórios:
+Vendor snapshots incorporados:
 
 - `artisys-storage`
-- `artisys-backup`
 - `artisys-auth-rbac`
-- `artisys-settings`
-- `artisys-alerts`
-
-Opcionais:
-
-- `artisys-planning`
+- `artisys-audit-log`
 - `artisys-inventory`
 - `artisys-reporting`
-- `artisys-capture`
-- `artisys-pwa-runtime`
-- `artisys-sync`
-- `artisys-catalog`
-- `artisys-audit-log`
-- `artisys-files`
-- `artisys-importer`
-- `artisys-feature-flags`
+- `artisys-pdf`
 
-Política: nenhuma dependência paga/cloud pode se tornar obrigatória.
+## Módulos locais de produto P2
+
+- capture
+- files/upload
+- checklists
+- agricultural catalog
+- feature flags
+- agricultural PDF integration
+
+Esses módulos usam a persistência genérica já existente e não adicionam serviço remoto obrigatório nem migration SQL adicional.
+
+## Manifesto / utilidades
+
+O `vertical.manifest.json` continua registrando o catálogo de módulos reutilizáveis obrigatórios/opcionais do ecossistema. A presença no manifesto não deve ser interpretada como dependência runtime automática; a incorporação efetiva é rastreada por `shared/core.lock.json` e pelos módulos locais do produto.
+
+Política: **nenhuma dependência paga/cloud pode se tornar obrigatória**.

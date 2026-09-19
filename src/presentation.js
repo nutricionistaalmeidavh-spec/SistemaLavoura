@@ -1,5 +1,7 @@
 import { createFunctionalPresentation } from '../shared/packages/ui-shell/src/functional.js';
 import { createEntityRepository } from '../shared/packages/vertical-persistence/src/repository.js';
+import { createProductEventBus } from '../shared/packages/product-eventbus/src/index.js';
+import { createProductSettings } from '../shared/packages/product-settings/src/index.js';
 import { createAgroShellModel } from './ui.js';
 import { createCropRepositories } from './catalog.js';
 import { scheduleFieldOperation, startFieldOperation, completeFieldOperation, cancelFieldOperation, createHarvestLot, cropYieldSummary } from './operations.js';
@@ -10,6 +12,12 @@ import { createSecurityService } from './security.js';
 
 const rows = (records) => records.map((record) => record.payload);
 const requireRecord = (record, label) => { if (!record) throw new Error(`${label} not found.`); return record; };
+export const PRODUCT_DEFAULT_SETTINGS=Object.freeze({
+  'inventory.lowStockThreshold':10,
+  'planning.lookAheadDays':30,
+  'alerts.enabled':true,
+  'reporting.csvDelimiter':','
+});
 
 export function createAgroLavouraPresentation({ persistence, localRuntime = null, recovery = null, capabilities = [] } = {}) {
   if (!persistence?.putRecord) throw new TypeError('Persistence adapter is required.');
@@ -18,6 +26,8 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
   const inventory = createInventoryService(persistence);
   const documents = createDocumentService(persistence);
   const security = createSecurityService(persistence);
+  const eventBus = createProductEventBus(persistence,{namespace:'agro-lavoura'});
+  const settings = createProductSettings(persistence,{namespace:'agro-lavoura',defaults:PRODUCT_DEFAULT_SETTINGS});
   const shell = createAgroShellModel({ capabilities });
 
   async function mutateOperation(id, transform, input) {
@@ -60,10 +70,10 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
     reports: { kind: 'reports', load: async () => ({ definitions: documents.definitions, issued: await persistence.listRecords('issued-documents') }), actions: { csv: ({ type, rows }) => documents.buildCsv(type, rows), issue: (input) => documents.issue(input) } },
     settings: {
       kind: 'settings',
-      async load() { return { local: localRuntime ? await localRuntime.startup({ online: false }) : { mode: 'local-first', networkRequired: false }, backups: recovery ? await recovery.listBackups() : [] }; },
+      async load() { return { local: localRuntime ? await localRuntime.startup({ online: false }) : { mode: 'local-first', networkRequired: false }, backups: recovery ? await recovery.listBackups() : [], configuration: await settings.snapshot() }; },
       actions: { backup: (input = {}) => { if (!recovery) throw new Error('Recovery service is not configured.'); return recovery.createBackup(input); }, restore: ({ id, ...options }) => { if (!recovery) throw new Error('Recovery service is not configured.'); return recovery.restoreBackup(id, options); } }
     }
   };
 
-  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery, persistence } });
+  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery, persistence, eventBus, settings, repos, finance, inventory, documents } });
 }

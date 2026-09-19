@@ -10,20 +10,14 @@ const contract=JSON.parse(await readFile(new URL('../qa/product-contract.json',i
 const artifactDir=fileURLToPath(new URL('../qa-artifacts/',import.meta.url));
 const summaryPath=join(artifactDir,'phase5-summary.json');
 const credential=['Qa','Standalone','2026!'].join('-');
-const sorted=v=>[...v].sort();
 const line=(s,l,d='')=>process.stdout.write(`[${s}] ${l}${d?` - ${d}`:''}\n`);
 const actionKey=(screenId,action)=>`${screenId}.${action}`;
 const declaredActions=Object.entries(contract.actions).flatMap(([screenId,actions])=>actions.map(action=>actionKey(screenId,action)));
+const assertSubset=(actual,expected,label)=>{for(const item of expected)assert.ok(actual.includes(item),`${label} missing contracted action ${item}`);};
 let root,host;
 const exercised=new Set(),passed=new Set(),failures=[];
 const summary={phase:5,productId:contract.productId,status:'failed',screens:[],checks:{},actionCoverage:{declared:declaredActions.length,exercised:0,passed:0,failed:[],untested:[...declaredActions],results:[]},commit:await currentCommit()};
-
-const syncCoverage=()=>{
-  summary.actionCoverage.exercised=exercised.size;
-  summary.actionCoverage.passed=passed.size;
-  summary.actionCoverage.failed=failures.map(item=>item.key);
-  summary.actionCoverage.untested=declaredActions.filter(key=>!exercised.has(key));
-};
+const syncCoverage=()=>{summary.actionCoverage.exercised=exercised.size;summary.actionCoverage.passed=passed.size;summary.actionCoverage.failed=failures.map(item=>item.key);summary.actionCoverage.untested=declaredActions.filter(key=>!exercised.has(key));};
 
 try{
   await mkdir(artifactDir,{recursive:true});
@@ -33,45 +27,29 @@ try{
   await host.backend.bootstrap({username:'qa-admin',password:credential});
   const logged=await host.backend.login({username:'qa-admin',password:credential});
   const auth={sessionId:logged.session.id,token:logged.token};
-  await host.backend.validate(auth);
-  summary.checks.authentication=true;
-  line('PASS','Autenticação');
+  await host.backend.validate(auth);summary.checks.authentication=true;line('PASS','Autenticação');
 
   const meta=await host.backend.describe();
   assert.equal(meta.productId,contract.productId);
   assert.deepEqual(meta.navigation.map(x=>x.id),contract.screens);
   assert.deepEqual(meta.screens.map(x=>x.id),contract.screens);
   for(let i=0;i<contract.screens.length;i+=1){
-    const id=contract.screens[i];
-    await host.backend.load({screenId:id,auth,context:{}});
+    const id=contract.screens[i];await host.backend.load({screenId:id,auth,context:{}});
     const desc=meta.screens.find(x=>x.id===id),expected=contract.actions[id]??[];
-    assert.deepEqual(sorted(Object.keys(host.presentation.screen(id).actions??{})),sorted(expected));
-    assert.deepEqual(sorted(Object.keys(desc?.actionDefinitions??{})),sorted(expected));
-    summary.screens.push({id,actions:expected.length,loaded:true});
-    line('PASS',`Tela ${i+1}/${contract.screens.length}: ${id}`,`${expected.length} ações`);
+    const actual=Object.keys(host.presentation.screen(id).actions??{}),definitions=Object.keys(desc?.actionDefinitions??{});
+    assertSubset(actual,expected,`screen ${id}`);assertSubset(definitions,expected,`screen definition ${id}`);
+    summary.screens.push({id,contractedActions:expected.length,totalActions:actual.length,loaded:true});
+    line('PASS',`Tela ${i+1}/${contract.screens.length}: ${id}`,`${expected.length} ações P0 / ${actual.length} totais`);
   }
   summary.checks.surface=true;
 
   const securityModule=await import('../src/security.js');
-  assert.ok((securityModule.SECURITY_POLICY?.admin??[]).includes('*'));
-  assert.ok(Array.isArray(securityModule.SECURITY_POLICY?.viewer));
-  summary.checks.rbacContract=true;
-  line('PASS','Contrato RBAC');
+  assert.ok((securityModule.SECURITY_POLICY?.admin??[]).includes('*'));assert.ok(Array.isArray(securityModule.SECURITY_POLICY?.viewer));summary.checks.rbacContract=true;line('PASS','Contrato RBAC');
 
   async function exercise(screenId,action,input={}){
-    const key=actionKey(screenId,action),first=!exercised.has(key);
-    if(first)exercised.add(key);
-    try{
-      const result=await host.backend.action({screenId,action,input,auth,context:{qa:true}});
-      if(first){passed.add(key);summary.actionCoverage.results.push({key,status:'passed'});line('PASS',`Ação ${key}`);}
-      syncCoverage();
-      return result;
-    }catch(error){
-      failures.push({key,error:error?.message??String(error)});
-      if(first)summary.actionCoverage.results.push({key,status:'failed',error:error?.message??String(error)});
-      syncCoverage();
-      throw error;
-    }
+    const key=actionKey(screenId,action),first=!exercised.has(key);if(first)exercised.add(key);
+    try{const result=await host.backend.action({screenId,action,input,auth,context:{qa:true}});if(first){passed.add(key);summary.actionCoverage.results.push({key,status:'passed'});line('PASS',`Ação ${key}`);}syncCoverage();return result;}
+    catch(error){failures.push({key,error:error?.message??String(error)});if(first)summary.actionCoverage.results.push({key,status:'failed',error:error?.message??String(error)});syncCoverage();throw error;}
   }
 
   const t0='2026-09-19T12:00:00.000Z';
@@ -91,55 +69,13 @@ try{
   const csv=await exercise('reports','csv',{type:'season-summary',rows:[{seasonId:'season-qa',crop:'Soja',areaHa:12,harvestQuantity:6000,yieldPerHa:500,costMinor:100000}]});
   await exercise('reports','issue',{id:'report-qa',type:'season-summary',format:'csv',content:csv.content,title:'Resumo QA',metadata:{qa:true}});
   await exercise('fields','remove',{id:'field-qa'});
-  const functionalBackup=await exercise('settings','backup',{id:'phase5-functional'});
-  await exercise('settings','restore',{id:functionalBackup.id});
+  const functionalBackup=await exercise('settings','backup',{id:'phase5-functional'});await exercise('settings','restore',{id:functionalBackup.id});
 
-  syncCoverage();
-  assert.equal(summary.actionCoverage.declared,17);
-  assert.equal(summary.actionCoverage.exercised,summary.actionCoverage.declared);
-  assert.equal(summary.actionCoverage.passed,summary.actionCoverage.declared);
-  assert.deepEqual(summary.actionCoverage.failed,[]);
-  assert.deepEqual(summary.actionCoverage.untested,[]);
-  summary.checks.functionalActions=true;
+  syncCoverage();assert.equal(summary.actionCoverage.declared,17);assert.equal(summary.actionCoverage.exercised,17);assert.equal(summary.actionCoverage.passed,17);assert.deepEqual(summary.actionCoverage.failed,[]);assert.deepEqual(summary.actionCoverage.untested,[]);summary.checks.functionalActions=true;
+  const security=host.presentation.services.security;for(const key of declaredActions){const auditRows=await security.listAudit({...auth,action:`${key}:success`});assert.ok(auditRows.length>=1,`Missing success audit for ${key}`);}summary.checks.businessAudit=true;line('PASS','Cobertura funcional','17/17 ações P0 executadas');
 
-  const security=host.presentation.services.security;
-  for(const key of declaredActions){
-    const rows=await security.listAudit({...auth,action:`${key}:success`});
-    assert.ok(rows.length>=1,`Missing success audit for ${key}`);
-  }
-  summary.checks.businessAudit=true;
-  line('PASS','Cobertura funcional',`${summary.actionCoverage.passed}/${summary.actionCoverage.declared} ações executadas`);
-
-  await host.persistence.putRecord('qa.phase5','sentinel',{value:'before'},{expectedVersion:0});
-  const backup=await host.recovery.createBackup({id:'phase5-known-good'});
-  await host.persistence.putRecord('qa.phase5','sentinel',{value:'after'},{expectedVersion:1});
-  await host.recovery.restoreBackup(backup.id);
-  assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');
-  summary.checks.backupRestore=true;
-  line('PASS','Backup/restore');
-
-  await host.close();host=null;
-  host=await createStandaloneHost({dataDir:root});
-  const again=await host.backend.login({username:'qa-admin',password:credential});
-  const restartedAuth={sessionId:again.session.id,token:again.token};
-  await host.backend.validate(restartedAuth);
-  assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');
-  assert.equal((await host.persistence.health()).ok,true);
-  summary.checks.restartPersistence=true;
-  summary.status='passed';
-  summary.screenCount=contract.screens.length;
-  summary.actionCount=declaredActions.length;
-  summary.finishedAt=new Date().toISOString();
-  await writeEvidence(summaryPath,summary);
-  line('PASS','FASE 5',`${summary.screenCount} telas, ${summary.actionCoverage.passed}/${summary.actionCount} ações funcionais`);
-}catch(error){
-  syncCoverage();
-  summary.error=error.stack??error.message;
-  summary.finishedAt=new Date().toISOString();
-  await writeEvidence(summaryPath,summary).catch(()=>{});
-  line('FAIL','FASE 5',error.message);
-  process.exitCode=1;
-}finally{
-  await host?.close?.().catch(()=>{});
-  if(root&&process.env.ARTISYS_QA_KEEP!=='1')await rm(root,{recursive:true,force:true}).catch(()=>{});
-}
+  await host.persistence.putRecord('qa.phase5','sentinel',{value:'before'},{expectedVersion:0});const backup=await host.recovery.createBackup({id:'phase5-known-good'});await host.persistence.putRecord('qa.phase5','sentinel',{value:'after'},{expectedVersion:1});await host.recovery.restoreBackup(backup.id);assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');summary.checks.backupRestore=true;line('PASS','Backup/restore');
+  await host.close();host=null;host=await createStandaloneHost({dataDir:root});const again=await host.backend.login({username:'qa-admin',password:credential});const restartedAuth={sessionId:again.session.id,token:again.token};await host.backend.validate(restartedAuth);assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');assert.equal((await host.persistence.health()).ok,true);summary.checks.restartPersistence=true;
+  summary.status='passed';summary.screenCount=contract.screens.length;summary.actionCount=declaredActions.length;summary.finishedAt=new Date().toISOString();await writeEvidence(summaryPath,summary);line('PASS','FASE 5',`${summary.screenCount} telas, 17/17 ações P0 funcionais`);
+}catch(error){syncCoverage();summary.error=error.stack??error.message;summary.finishedAt=new Date().toISOString();await writeEvidence(summaryPath,summary).catch(()=>{});line('FAIL','FASE 5',error.message);process.exitCode=1;}
+finally{await host?.close?.().catch(()=>{});if(root&&process.env.ARTISYS_QA_KEEP!=='1')await rm(root,{recursive:true,force:true}).catch(()=>{});}

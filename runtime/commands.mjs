@@ -17,17 +17,18 @@ export function createCommandDispatcher({presentation}={}){
       const transactional=!NON_TRANSACTIONAL.has(command)&&typeof persistence?.runInTransaction==='function';
       const commandId=globalThis.crypto?.randomUUID?.()??`command-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       let domainEvent=null;
-      const work=async()=>{
-        const result=await presentation.action(screenId,action,input,context);
+      const work=async(execution={})=>{
+        const actionContext={...context,actorId:execution.user?.id??null,actor:execution.user??null,session:execution.session??null,commandId};
+        const result=await presentation.action(screenId,action,input,actionContext);
         if(eventBus){
           domainEvent=await eventBus.publish(`agro.${String(screenId)}.${String(action)}.completed`,{
             entityId:entityIdOf(input,result),
             input:clone(input??{})
-          },{metadata:{commandId,screenId:String(screenId),action:String(action),transactional}});
+          },{metadata:{commandId,screenId:String(screenId),action:String(action),transactional,actorId:execution.user?.id??null}});
         }
         return result;
       };
-      const invoke=transactional?()=>persistence.runInTransaction(work):work;
+      const invoke=execution=>transactional?()=>persistence.runInTransaction(()=>work(execution)):()=>work(execution);
       const executed=await security.execute({
         ...credentials(auth),
         permission:permissionFor(screenId,action),
@@ -35,7 +36,7 @@ export function createCommandDispatcher({presentation}={}){
         entityType:String(screenId),
         entityId:input?.id??null,
         metadata:{commandId,screenId:String(screenId),action:String(action),transactional}
-      },invoke);
+      },execution=>invoke(execution)());
       if(domainEvent&&eventBus)await eventBus.flush(domainEvent.id);
       return executed.result;
     }

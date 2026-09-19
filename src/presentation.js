@@ -9,6 +9,7 @@ import { createCropExpense, createHarvestIncome, cropFinancialMetrics } from './
 import { createInventoryService } from './inventory.js';
 import { createDocumentService } from './documents.js';
 import { createSecurityService } from './security.js';
+import { createCropAlertService } from './alerts.js';
 
 const rows = (records) => records.map((record) => record.payload);
 const requireRecord = (record, label) => { if (!record) throw new Error(`${label} not found.`); return record; };
@@ -28,7 +29,25 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
   const security = createSecurityService(persistence);
   const eventBus = createProductEventBus(persistence,{namespace:'agro-lavoura'});
   const settings = createProductSettings(persistence,{namespace:'agro-lavoura',defaults:PRODUCT_DEFAULT_SETTINGS});
+  const alerts = createCropAlertService(persistence,{namespace:'agro-lavoura'});
   const shell = createAgroShellModel({ capabilities });
+
+  eventBus.subscribe('agro.operations.schedule.completed',async event=>{
+    if(await settings.get('alerts.enabled')===false)return;
+    const input=event.payload?.input??{};
+    if(!input.id||!input.scheduledAt)return;
+    await alerts.upsert({id:`operation:${input.id}:scheduled`,entityRef:{kind:'operation',id:String(input.id)},title:`Operação programada: ${input.typeId??input.id}`,dueAt:input.scheduledAt,severity:'warning',metadata:{seasonId:input.seasonId??null,fieldId:input.fieldId??null,typeId:input.typeId??null,commandId:event.metadata?.commandId??null}});
+  });
+  const inventoryAlertHandler=async event=>{
+    if(await settings.get('alerts.enabled')===false)return;
+    const input=event.payload?.input??{};if(!input.sku)return;
+    const threshold=Number(await settings.get('inventory.lowStockThreshold'));
+    const available=await inventory.available(input.sku);
+    if(!Number.isFinite(threshold)||available>=threshold)return;
+    await alerts.upsert({id:`inventory:${input.sku}:low-stock`,entityRef:{kind:'inventory',id:String(input.sku)},title:`Estoque baixo: ${input.sku}`,dueAt:new Date().toISOString(),severity:'critical',metadata:{sku:String(input.sku),available,threshold,commandId:event.metadata?.commandId??null}});
+  };
+  eventBus.subscribe('agro.inventory.receive.completed',inventoryAlertHandler);
+  eventBus.subscribe('agro.inventory.consume.completed',inventoryAlertHandler);
 
   async function mutateOperation(id, transform, input) {
     const current = requireRecord(await repos.operations.get(id), 'Field operation');
@@ -39,16 +58,22 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
     overview: {
       kind: 'dashboard',
       async load() {
-        const [fields, seasons, operations, harvestLots, entries] = await Promise.all([
-          repos.fields.list(), repos.seasons.list(), repos.operations.list(), repos.harvestLots.list(), finance.list()
+        const [fields, seasons, operations, harvestLots, entries,alertItems] = await Promise.all([
+          repos.fields.list(), repos.seasons.list(), repos.operations.list(), repos.harvestLots.list(), finance.list(),alerts.list()
         ]);
         const yieldSummary = cropYieldSummary(rows(harvestLots));
         const financial = cropFinancialMetrics(rows(entries), {});
         return Object.freeze({
-          cards: Object.freeze({ fields: fields.length, seasons: seasons.length, completedOperations: rows(operations).filter((operation) => operation.status === 'completed').length, harvestQuantity: yieldSummary.quantity, resultMinor: financial.marginMinor }),
+          cards: Object.freeze({ fields: fields.length, seasons: seasons.length, completedOperations: rows(operations).filter((operation) => operation.status === 'completed').length, harvestQuantity: yieldSummary.quantity, resultMinor: financial.marginMinor, activeAlerts: alertItems.filter(item=>item.status!=='dismissed').length }),
           yield: yieldSummary,
-          financial
+          financial,
+          alerts:Object.freeze(alertItems.filter(item=>item.status!=='dismissed'))
         });
+      },
+      actions:{
+        acknowledgeAlert:({id},context={})=>alerts.acknowledge(id,{actorId:context.actorId??'system'}),
+        snoozeAlert:({id,until})=>alerts.snooze(id,{until}),
+        dismissAlert:({id,reason},context={})=>alerts.dismiss(id,{actorId:context.actorId??'system',reason})
       }
     },
     fields: { kind: 'table-form', load: async () => ({ rows: await repos.fields.list() }), actions: { save: (entity, options) => repos.fields.save(entity, options ?? {}), remove: ({ id, expectedVersion }) => repos.fields.remove(id, { expectedVersion }) } },
@@ -75,5 +100,5 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
     }
   };
 
-  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery, persistence, eventBus, settings, repos, finance, inventory, documents } });
+  return createFunctionalPresentation({ shell, screens, services: { security, localRuntime, recovery, persistence, eventBus, settings, alerts, repos, finance, inventory, documents } });
 }

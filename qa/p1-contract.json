@@ -1,0 +1,23 @@
+{
+  "productId": "agro-lavoura",
+  "modules": [
+    "eventbus",
+    "workflow-engine",
+    "inventory",
+    "settings",
+    "reporting",
+    "dashboard",
+    "planning",
+    "alerts",
+    "importer",
+    "exporter",
+    "search",
+    "finance-domain"
+  ],
+  "actions": {
+    "overview": ["search", "acknowledgeAlert", "snoozeAlert", "dismissAlert"],
+    "operations": ["savePlan"],
+    "reports": ["summary", "export"],
+    "settings": ["set", "merge", "previewImport", "applyImport"]
+  }
+}

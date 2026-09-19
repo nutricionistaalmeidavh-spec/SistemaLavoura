@@ -10,6 +10,18 @@
 - Dependência obrigatória paga: **nenhuma**
 - Operação: local-first / self-hosted
 
+## P0 hardening
+
+Integrado na branch `migration/standalone-phase-0-8`.
+
+- `settings` deixou de aceitar acesso genérico de qualquer sessão autenticada.
+- `backup` e `restore` usam permissões explícitas e ficam restritos ao `admin` pela política atual.
+- writes de `fields`, `seasons`, `inputs` e `operationTypes` passam pelos validadores de domínio antes da persistência.
+- regressões específicas vivem em `tests/p0-hardening.test.js`.
+- `.github/workflows/p0-hardening.yml` prepara verificação Linux e certificação sintética Windows com upload das evidências e do instalador.
+
+Verificação isolada dos módulos alterados foi executada com Node 22 e passou. O GitHub ainda não registrou workflow runs após os pushes/merge desta alteração; portanto o CI hospedado não deve ser considerado homologado até existir uma execução real registrada pelo Actions.
+
 ## Fases 5–6
 
 Implementadas em código. A homologação continua dependente de execução fresca no ambiente Windows.
@@ -34,4 +46,4 @@ Evidências esperadas:
 - `qa-artifacts/playwright-summary.json`
 - `qa-artifacts/release-certification.json`
 
-**Estado:** Fases 0–8 implementadas; homologação real ainda requer execução fresca do comando acima. Até certificação `passed`, `main` não deve ser promovida e o monorepo continua rollback/reference.
+**Estado:** P0 de código integrado e Fases 0–8 implementadas; homologação real ainda requer execução fresca do comando acima contra banco legado real. Até certificação `passed`, `main` não deve ser promovida e o monorepo continua rollback/reference.

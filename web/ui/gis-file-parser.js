@@ -6,7 +6,8 @@ import {ISOXMLManager} from 'isoxml';
 import {normalizeGisFeatureCollection} from '../../src/gis-import.js';
 
 const bytesOf=value=>value instanceof Uint8Array?value:new Uint8Array(value instanceof ArrayBuffer?value:value?.buffer??[]);
-const asFeatureCollection=value=>Array.isArray(value)?{type:'FeatureCollection',features:value.flatMap(item=>item?.features??[])}:value;
+const exactBuffer=value=>{const bytes=bytesOf(value);return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);};
+const asFeatureCollection=value=>Array.isArray(value)?{type:'FeatureCollection',features:value.flatMap(item=>item?.type==='Feature'?item:item?.features??[])}:value;
 const lower=value=>String(value??'').toLowerCase();
 
 export function detectGisFormat(name='',type=''){
@@ -46,12 +47,17 @@ async function parseIsoXmlDefault({bytes,text,name}){
 }
 
 const inspectZipDefault=bytes=>Object.keys(unzipSync(bytesOf(bytes)));
-const parseShapefileDefault=bytes=>shp(bytesOf(bytes));
+const parseShapefileDefault=bytes=>shp(exactBuffer(bytes));
+function parseRawShapefileDefault(bytes){
+  const geometries=shp.parseShp(exactBuffer(bytes));
+  const list=Array.isArray(geometries)?geometries:[geometries].filter(Boolean);
+  return {type:'FeatureCollection',features:list.map((geometry,index)=>({type:'Feature',id:`shape-${index+1}`,properties:{},geometry}))};
+}
 
 export async function parseGisFile({name='',type='',bytes=null,text=null}={},options={}){
-  const filename=lower(name),mime=lower(type);
   const inspectZip=options.inspectZip??inspectZipDefault;
   const parseShapefile=options.parseShapefile??parseShapefileDefault;
+  const parseRawShapefile=options.parseRawShapefile??parseRawShapefileDefault;
   const parseIsoxml=options.parseIsoxml??parseIsoXmlDefault;
   let format=detectGisFormat(name,type);let raw=null;let warnings=[];
   if(format==='geojson')raw=JSON.parse(text??new TextDecoder().decode(bytesOf(bytes)));
@@ -65,10 +71,12 @@ export async function parseGisFile({name='',type='',bytes=null,text=null}={},opt
     else if(names.some(path=>/\.shp$/i.test(path))){format='shapefile';raw=await parseShapefile(bytesOf(bytes));}
     else throw new TypeError('ZIP não reconhecido como Shapefile ou ISOXML/TaskData.');
   }else if(format==='shapefile'){
-    throw new TypeError('Arquivo .shp isolado não preserva atributos/projeção. Compacte .shp, .dbf e .prj em ZIP para importar com segurança.');
+    const geometries=await parseRawShapefile(bytesOf(bytes));
+    raw=Array.isArray(geometries)?{type:'FeatureCollection',features:geometries.map((geometry,index)=>geometry?.type==='Feature'?geometry:{type:'Feature',id:`shape-${index+1}`,properties:{},geometry})}:geometries;
+    warnings.push('Arquivo .shp sem .prj/.dbf: coordenadas assumidas em WGS84 e atributos associados não foram incluídos. Para preservar projeção e atributos, prefira ZIP com .shp, .dbf e .prj.');
   }else if(format==='isoxml'){
     const parsed=await parseIsoxml({text:text??new TextDecoder().decode(bytesOf(bytes)),name});raw=parsed;warnings=parsed.warnings??[];
-  }else throw new TypeError('Formato GIS não suportado. Use GeoJSON, KML, KMZ, GPX, Shapefile ZIP ou ISOXML/TaskData.');
+  }else throw new TypeError('Formato GIS não suportado. Use GeoJSON, KML, KMZ, GPX, Shapefile ou ISOXML/TaskData.');
   const normalized=normalizeGisFeatureCollection(asFeatureCollection(raw));
   return Object.freeze({format,sourceFile:name||null,featureCollection:normalized,warnings:Object.freeze(warnings.map(String))});
 }

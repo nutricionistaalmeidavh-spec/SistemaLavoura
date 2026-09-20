@@ -28,6 +28,21 @@ export async function submitDialog(dialog,buttonName){
   await expect(dialog).toBeHidden();
 }
 
+export async function selectOptionContaining(selectLocator,text){
+  const option=selectLocator.locator('option').filter({hasText:text}).first();
+  await expect(option).toHaveCount(1);
+  const value=await option.getAttribute('value');
+  if(value==null||value==='')throw new Error(`Option containing "${text}" has no selectable value.`);
+  await selectLocator.selectOption(value);
+}
+
+export async function selectOperationRow(page,name){
+  const row=page.locator('.workspace-split .workspace-table tbody tr').filter({hasText:name}).first();
+  await expect(row).toBeVisible();
+  await row.click();
+  return row;
+}
+
 export async function createField(page,{code='E2E-01',name='Talhão E2E',farm='Fazenda E2E',area='10'}={}){
   await page.getByTestId('nav-fields').click();
   await page.getByRole('button',{name:'Novo talhão'}).click();

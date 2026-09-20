@@ -61,7 +61,7 @@ test('threshold rule honors occurrences and hysteresis for new telemetry',async(
 
 test('IoT UI exposes human setup, rules and alerts without command controls or JSON editor',()=>{
   const source=read('web/iot/IoTWorkspace.jsx');
-  for(const action of ['saveDevice','bindField','saveAdapterConfig','saveRule','removeRule'])assert.match(source,new RegExp(action));
+  for(const action of ['saveDevice','bindField','saveAdapterConfig','setAdapterEnabled','saveRule','removeRule'])assert.match(source,new RegExp(action));
   assert.match(source,/Configura[cç][aã]o/i);assert.match(source,/Regras de alerta/i);assert.match(source,/Alertas ativos/i);
   assert.doesNotMatch(source,/requestCommand|iot:command|JSON\.stringify\(.*config/);
 });

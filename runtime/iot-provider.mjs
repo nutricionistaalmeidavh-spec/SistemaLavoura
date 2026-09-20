@@ -185,6 +185,11 @@ export function createSqliteIoTReadProvider({dbPath,persistence=null,alerts=null
     const db=new DatabaseSync(dbPath);
     try{return work(createIoTRepository(db),db);}finally{db.close();}
   }
+  async function refreshAlerts(){
+    const raw=readRaw(),rules=await listRules();
+    await reconcileAlerts({...raw,rules});
+    return Object.freeze(await productIoTAlerts());
+  }
   async function action(name,input={}){
     if(name==='saveDevice')return withRepository(repository=>{
       const device=Object.freeze({id:typeof input.id==='string'&&input.id.trim()?input.id.trim():idFor('iot-device'),name:text(input.name,'Device name'),type:text(input.type,'Device type'),protocol:text(input.protocol,'Protocol'),manufacturer:input.manufacturer??null,model:input.model??null,gatewayId:input.gatewayId??null,status:input.status??'unknown',lastSeenAt:input.lastSeenAt??null,batteryLevel:input.batteryLevel===''||input.batteryLevel==null?null:Number(input.batteryLevel),signalStrength:input.signalStrength===''||input.signalStrength==null?null:Number(input.signalStrength),metadata:Object.freeze({})});
@@ -196,6 +201,12 @@ export function createSqliteIoTReadProvider({dbPath,persistence=null,alerts=null
       return repository.bindField(Object.freeze({deviceId,fieldId,installedAt,removedAt:null,position:null,notes:input.notes??null}));
     });
     if(name==='saveAdapterConfig')return withRepository(repository=>repository.saveAdapterConfig(adapterConfig(input)));
+    if(name==='setAdapterEnabled')return withRepository(repository=>{
+      const id=text(input.id,'Adapter id');
+      const current=repository.listAdapterConfigs().find(item=>item.id===id);
+      if(!current)throw new Error('IoT adapter config not found.');
+      return repository.saveAdapterConfig(Object.freeze({...current,enabled:Boolean(input.enabled),updatedAt:clock()}));
+    });
     if(name==='saveRule'){
       if(!persistence?.putRecord)throw new Error('IoT rule persistence is unavailable in this environment.');
       const rule=normalizeRule(input),current=await persistence.getRecord(RULES_COLLECTION,rule.id);
@@ -213,6 +224,7 @@ export function createSqliteIoTReadProvider({dbPath,persistence=null,alerts=null
 
   return Object.freeze({
     action,
+    refreshAlerts,
     async snapshot(){
       const raw=readRaw(),rules=await listRules();
       await reconcileAlerts({...raw,rules});

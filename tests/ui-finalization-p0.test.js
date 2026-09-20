@@ -14,14 +14,14 @@ test('fields UI offers a real browser download for selected attachments',()=>{
   assert.match(source,/>Baixar</);
 });
 
-test('reports UI turns CSV, PDF and generic exports into downloadable files',()=>{
+test('reports UI turns CSV, PDF and generic exports into downloadable files without replacing certified UX feedback',()=>{
   const source=read('web/ui/reports.jsx');
-  assert.match(source,/downloadTextFile/);
-  assert.match(source,/downloadBinaryFile/);
-  assert.match(source,/downloadExportResult/);
-  assert.match(source,/Gerar e baixar CSV/);
-  assert.match(source,/Gerar e baixar PDF/);
-  assert.match(source,/Exportar e baixar/);
+  assert.match(source,/downloadTextFile\(result\?\.content/);
+  assert.match(source,/downloadBinaryFile\(result\?\.content/);
+  assert.match(source,/downloadExportResult\(result/);
+  assert.match(source,/>Gerar CSV</);
+  assert.match(source,/>Gerar PDF</);
+  assert.match(source,/Resultado pronto/);
 });
 
 test('finance UI accepts human selections and reais instead of technical IDs or cents',()=>{

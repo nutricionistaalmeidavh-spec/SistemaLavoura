@@ -1,0 +1,50 @@
+name: P6 GIS import
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/gis-import.js'
+      - 'src/presentation-p6.js'
+      - 'src/presentation-p7.js'
+      - 'src/agricultural-map.js'
+      - 'web/ui/gis-file-parser.js'
+      - 'web/ui/gis-import.jsx'
+      - 'web/ui/gis-import.css'
+      - 'web/ui/agricultural-map.jsx'
+      - 'web/ui/agricultural-map.css'
+      - 'web/ui/runtime.jsx'
+      - 'web/main.jsx'
+      - 'runtime/host.mjs'
+      - 'tests/p6*.test.js'
+      - 'tests/e2e/p6-gis-import.spec.mjs'
+      - 'package.json'
+      - '.github/workflows/p6-gis-import.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p6-gis-import-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run full unit and contract suite
+        run: npm test
+      - name: Build web product
+        run: npm run build:web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run P6 GIS journey
+        run: npx playwright test tests/e2e/p6-gis-import.spec.mjs

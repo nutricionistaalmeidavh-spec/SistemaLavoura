@@ -1,0 +1,11 @@
+{
+  "name": "ArtiSys Agro Lavoura",
+  "short_name": "Lavoura",
+  "description": "Gestão agrícola local-first com modo campo offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F7F4",
+  "theme_color": "#24513B",
+  "orientation": "any"
+}

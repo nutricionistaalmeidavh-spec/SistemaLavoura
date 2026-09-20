@@ -69,3 +69,10 @@ test('reports UI translates human summary choices before calling the generic bac
   assert.match(source,/buildReportSummaryRequest/);
   assert.doesNotMatch(source,/onRun\('summary',\{rows,\.\.\.values\}\)/);
 });
+
+test('reports UI renders grouped summary results for the user',()=>{
+  const source=read('web/ui/reports.jsx');
+  assert.match(source,/summary-result-list/);
+  assert.match(source,/Object\.entries\(lastResult\.result\)/);
+  assert.match(source,/formatReportSummaryValue/);
+});

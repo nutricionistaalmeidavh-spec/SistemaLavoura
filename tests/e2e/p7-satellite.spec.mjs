@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 
 const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
 const cors={'access-control-allow-origin':'*','access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':'content-type, accept'};
+const previewUrl='https://download.dataspace.copernicus.eu/s2.png';
 async function enter(page,password){
   await page.goto('/');
   await page.getByTestId('password').fill(password);
@@ -18,9 +19,9 @@ test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({pa
     const body=request.postDataJSON();
     expect(body.collections).toEqual(['sentinel-2-l2a']);
     expect(body.bbox).toHaveLength(4);
-    await route.fulfill({status:200,contentType:'application/geo+json',headers:cors,body:JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',id:'S2-TEST',collection:'sentinel-2-l2a',bbox:[-47.92,-21.23,-47.88,-21.19],properties:{datetime:'2026-09-18T10:00:00Z','eo:cloud_cover':4},assets:{thumbnail:{href:'https://example.test/s2.png'},B04_10m:{href:'https://example.test/red.tif'},B08_10m:{href:'https://example.test/nir.tif'}}}]})});
+    await route.fulfill({status:200,contentType:'application/geo+json',headers:cors,body:JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',id:'S2-TEST',collection:'sentinel-2-l2a',bbox:[-47.92,-21.23,-47.88,-21.19],properties:{datetime:'2026-09-18T10:00:00Z','eo:cloud_cover':4},assets:{thumbnail:{href:previewUrl},B04_10m:{href:'https://download.dataspace.copernicus.eu/red.tif'},B08_10m:{href:'https://download.dataspace.copernicus.eu/nir.tif'}}}]})});
   });
-  await page.route('https://example.test/s2.png',async route=>{
+  await page.route(previewUrl,async route=>{
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
     return route.fulfill({status:200,contentType:'image/png',headers:cors,body:pixel});
   });

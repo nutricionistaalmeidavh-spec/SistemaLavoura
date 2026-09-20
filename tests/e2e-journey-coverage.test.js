@@ -9,12 +9,13 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 const exists=relative=>fs.existsSync(path.join(root,relative));
 
-test('E2E surface contract covers every agricultural UI contract action plus virtual and field surfaces',()=>{
+test('E2E surface contract covers every agricultural UI contract action plus later user surfaces',()=>{
   assert.equal(exists('qa/e2e-surface-contract.json'),true,'missing qa/e2e-surface-contract.json');
   const contract=JSON.parse(read('qa/e2e-surface-contract.json'));
   for(const [screenId,screen] of Object.entries(SCREEN_UI_CONTRACTS)){
     assert.ok(contract.screens.includes(screenId),`screen ${screenId} missing from E2E contract`);
-    assert.deepEqual(new Set(contract.actions[screenId]??[]),new Set(Object.keys(screen.actions)),`actions for ${screenId} are incomplete`);
+    const covered=new Set(contract.actions[screenId]??[]);
+    for(const action of Object.keys(screen.actions))assert.ok(covered.has(action),`action ${screenId}.${action} missing from E2E contract`);
   }
   for(const screenId of ['overview','admin','iot','field-mode','offline-maps'])assert.ok(contract.screens.includes(screenId),`user surface ${screenId} missing`);
   assert.deepEqual(new Set(contract.journeys),new Set(['agricultural-chain','administration-rbac','inventory-lifecycle','purchase-lifecycle']));

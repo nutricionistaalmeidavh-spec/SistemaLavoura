@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {captureStep,createField,createInput,createSeason,enterProduct,fillLines,submitDialog} from './evidence-helpers.mjs';
+import {captureStep,createField,createInput,createSeason,enterProduct,fillLines,selectOperationRow,selectOptionContaining,submitDialog} from './evidence-helpers.mjs';
 
 const password=['Agricultural','Journey','2026!'].join('-');
 const select=(dialog,id,label)=>dialog.locator(`#field-${id}`).selectOption({label});
@@ -32,10 +32,9 @@ test('agricultural-chain uses the UI from field registration through report issu
   await d.getByLabel('Programada para',{exact:true}).fill('2026-09-21T08:00');
   await fillLines(d,'Insumos planejados','Insumo Cadeia E2E | 20');
   await submitDialog(d,'Programar operação');
-  await expect(page.getByText('Operação Cadeia E2E',{exact:true}).first()).toBeVisible();
+  await selectOperationRow(page,'Operação Cadeia E2E');
   await captureStep(page,testInfo,'operacao-programada');
 
-  await page.getByText('Operação Cadeia E2E',{exact:true}).first().click();
   await page.getByRole('button',{name:'Iniciar',exact:true}).click();
   d=page.getByRole('dialog');
   await d.getByLabel('Iniciada em',{exact:true}).fill('2026-09-21T08:05');
@@ -97,7 +96,7 @@ test('agricultural-chain uses the UI from field registration through report issu
 
   await page.getByRole('button',{name:'Registrar entrega',exact:true}).click();
   d=page.getByRole('dialog');
-  await d.locator('#field-saleId').selectOption({label:/Comprador Cadeia E2E/});
+  await selectOptionContaining(d.locator('#field-saleId'),'Comprador Cadeia E2E');
   await d.getByLabel('Quantidade entregue',{exact:true}).fill('100');
   await d.getByLabel('Romaneio/Referência',{exact:true}).fill('ROM-CHAIN-01');
   await submitDialog(d,'Registrar entrega');

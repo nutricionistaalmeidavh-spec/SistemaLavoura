@@ -29,7 +29,7 @@ test('P7 normalizes Sentinel and Landsat asset aliases',()=>{
 });
 
 test('P7 calculates NDVI with zero-denominator and clamps values',()=>{
-  const grid=calculateNdviGrid({red:[0.2,0,1,-2],nir:[0.6,0,3,2],width:2,height:2});
+  const grid=calculateNdviGrid({red:[0.2,0,1,-1],nir:[0.6,0,3,2],width:2,height:2});
   assert.equal(grid.width,2);
   assert.equal(grid.height,2);
   assert.equal(grid.values[0],0.5);

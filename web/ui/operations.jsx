@@ -5,6 +5,16 @@ import {ConfirmDialog,DataTable,KpiStrip,Modal,PageHeader,StatusBadge,Structured
 const uid=prefix=>globalThis.crypto?.randomUUID?.()??`${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const date=value=>value?new Date(value).toLocaleDateString('pt-BR'):'—';
 const dateTime=value=>value?new Date(value).toLocaleString('pt-BR'):'—';
+const fold=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
+const plannedInputItems=(lines,references)=>((lines??[]).map((line,index)=>{
+  const [namePart,quantityPart]=String(line).split('|').map(part=>part.trim());
+  if(!namePart||!quantityPart)throw new Error(`Insumo planejado linha ${index+1}: use Nome | quantidade.`);
+  const quantity=Number(quantityPart.replace(',','.'));
+  if(!Number.isFinite(quantity)||quantity<=0)throw new Error(`Insumo planejado linha ${index+1}: informe uma quantidade positiva.`);
+  const input=(references.inputOptions??[]).find(option=>fold(option.value)===fold(namePart)||fold(option.label)===fold(namePart)||fold(String(option.label).replace(/\s*\([^)]*\)\s*$/,''))===fold(namePart));
+  if(!input)throw new Error(`Insumo planejado linha ${index+1}: "${namePart}" não foi encontrado no cadastro de insumos.`);
+  return {inputId:String(input.value),quantity};
+}));
 
 export function LavouraOperationsWorkspace({data,onRun}){
   const contract=getUiContract('operations');
@@ -86,6 +96,7 @@ export function LavouraOperationsWorkspace({data,onRun}){
   function openAction(name){setDialog({name});}
   async function submitAction(name,values){setBusy(true);try{
     let input=values;
+    if(name==='schedule'){const {plannedInputs,...rest}=values;input={...rest,inputItems:plannedInputItems(plannedInputs,references)};}
     if(['start','complete','cancel'].includes(name))input={id:selectedRow?.id,...values};
     if(name==='savePlan')input={id:uid('plan'),seasonId:values.seasonId,name:values.name,tasks:[{id:uid('task'),title:values.taskTitle,start:values.taskStart,end:values.taskEnd,progress:Number(values.progress??0),resourceId:values.resourceId||null,dependencies:[]}]};
     if(name==='createChecklist')input={title:values.title,entityId:selectedRow?.id,items:(values.items??[]).map((label,index)=>({id:`item-${index+1}`,label,required:true}))};
@@ -96,7 +107,11 @@ export function LavouraOperationsWorkspace({data,onRun}){
   async function completeChecklist(checklist){await onRun('completeChecklist',{id:checklist.id});}
 
   const dialogAction=dialog?.name?contract.actions[dialog.name]:null;
-  const dialogFields=useMemo(()=>hydrateUiFields(dialogAction?.fields??[],references),[dialogAction,references]);
+  const dialogFields=useMemo(()=>{
+    const base=hydrateUiFields(dialogAction?.fields??[],references);
+    if(dialog?.name!=='schedule')return base;
+    return [...base,{name:'plannedInputs',label:'Insumos planejados',type:'lines',help:'Um por linha: nome do insumo | quantidade total prevista. Ex.: Glifosato | 120'}];
+  },[dialogAction,dialog?.name,references]);
   const operationName=selectedRow?(selectedRow.typeName??referenceLabel(references,'operationTypeOptions',selectedRow.typeId)):'';
   return <section className="product-workspace" data-testid="operations-workspace">
     <PageHeader eyebrow="Produção" title="Operações" description="Planeje, execute e conclua atividades de campo com estoque, custos, caderno de campo e visão operacional integrados." actions={<><button type="button" className="primary-button" onClick={()=>openAction('schedule')}>Programar operação</button><button type="button" onClick={()=>openAction('savePlan')}>Novo planejamento</button><button type="button" onClick={()=>openAction('recordApplication')}>Registrar aplicação</button><button type="button" onClick={()=>openAction('addScouting')}>Monitoramento</button><button type="button" onClick={()=>openAction('recordRainfall')}>Registrar chuva</button></>}/>
@@ -106,7 +121,7 @@ export function LavouraOperationsWorkspace({data,onRun}){
 
     <section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Gantt e progresso detalhado</span><h3>Linha do tempo completa</h3></div><span>{planningProgress.toLocaleString('pt-BR',{maximumFractionDigits:1})}% concluído · {gantt.length} tarefas</span></div><DataTable columns={ganttColumns} rows={gantt} emptyTitle="Nenhuma tarefa no Gantt" emptyDescription="Crie um planejamento para acompanhar dependências e progresso."/></section>
 
-    <div className="settings-grid"><section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Necessidade futura</span><h3>Previsão de insumos</h3></div><span>{requirements.filter(item=>Number(item.toBuy)>0).length} com compra necessária</span></div><DataTable columns={requirementColumns} rows={requirements} emptyTitle="Sem necessidade futura calculada" emptyDescription="As necessidades aparecem conforme operações planejadas possuam insumos previstos."/></section><section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Pluviometria</span><h3>Histórico analítico de chuva</h3></div><span>{rainfall.length} medições · {Number(commercial.climate?.totalRainMm??0).toLocaleString('pt-BR')} mm</span></div><DataTable columns={rainfallColumns} rows={rainfall} emptyTitle="Sem pluviometria registrada"/></section></div>
+    <div className="settings-grid"><section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Necessidade futura</span><h3>Previsão de insumos</h3></div><span>{requirements.filter(item=>Number(item.toBuy)>0).length} com compra necessária</span></div><DataTable columns={requirementColumns} rows={requirements} emptyTitle="Sem necessidade futura calculada" emptyDescription="Planeje os insumos ao programar operações para calcular automaticamente necessidade, estoque disponível e compra futura."/></section><section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Pluviometria</span><h3>Histórico analítico de chuva</h3></div><span>{rainfall.length} medições · {Number(commercial.climate?.totalRainMm??0).toLocaleString('pt-BR')} mm</span></div><DataTable columns={rainfallColumns} rows={rainfall} emptyTitle="Sem pluviometria registrada"/></section></div>
 
     <section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Histórico completo</span><h3>Aplicações agrícolas</h3></div><span>{applications.length}</span></div><DataTable columns={applicationColumns} rows={applications} emptyTitle="Nenhuma aplicação registrada"/></section>
     <section className="workspace-panel"><div className="panel-heading"><div><span className="eyebrow">Histórico completo</span><h3>Monitoramentos agronômicos</h3></div><span>{scouting.filter(item=>item.row.status!=='closed').length} abertos · {scouting.length} registros</span></div><DataTable columns={scoutingColumns} rows={scouting} emptyTitle="Nenhum monitoramento registrado"/></section>

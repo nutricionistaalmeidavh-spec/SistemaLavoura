@@ -13,10 +13,10 @@ async function createInput(page,{name='NPK E2E',unit='kg',category='Fertilizante
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
   await dialog.getByLabel('Nome',{exact:true}).fill(name);
-  await dialog.getByLabel('Unidade',{exact:true}).selectOption(unit);
+  await dialog.locator('#field-unit').selectOption(unit);
   await dialog.getByLabel('Categoria',{exact:true}).fill(category);
   await dialog.getByLabel('Custo unitário (R$)',{exact:true}).fill(unitCost);
-  await dialog.getByRole('button',{name:'Salvar insumo',exact:true}).click();
+  await dialog.getByRole('button',{name:'Salvar',exact:true}).click();
   await expect(page.getByText(name,{exact:true}).first()).toBeVisible();
 }
 
@@ -38,7 +38,7 @@ async function createSeason(page,{crop='Soja',period='2026/27'}={}){
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
   await dialog.getByLabel('Cultura',{exact:true}).fill(crop);
-  await dialog.getByLabel('Safra/Período',{exact:true}).fill(period);
+  await dialog.locator('#field-periodName').fill(period);
   await dialog.getByRole('button',{name:'Salvar',exact:true}).click();
   await expect(page.getByText(crop,{exact:true}).first()).toBeVisible();
 }

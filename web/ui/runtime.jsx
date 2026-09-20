@@ -12,6 +12,7 @@ import {LavouraHarvestWorkspace} from './harvest.jsx';
 import {LavouraReportsWorkspace} from './reports.jsx';
 import {LavouraSettingsWorkspace} from './settings.jsx';
 import {LavouraAdminWorkspace} from './admin.jsx';
+import {IoTWorkspace} from '../iot/IoTWorkspace.jsx';
 
 function Auth({backend,onAuth}){
   const [hasUsers,setHasUsers]=useState(true);
@@ -41,7 +42,8 @@ const specializedScreens={
   finance:LavouraFinanceWorkspace,
   reports:LavouraReportsWorkspace,
   settings:LavouraSettingsWorkspace,
-  admin:LavouraAdminWorkspace
+  admin:LavouraAdminWorkspace,
+  iot:IoTWorkspace
 };
 
 export function LavouraProductRuntime({backend}){

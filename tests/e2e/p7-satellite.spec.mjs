@@ -17,7 +17,6 @@ test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({pa
   });
   await page.route('https://example.test/s2.png',route=>route.fulfill({status:200,contentType:'image/png',body:pixel}));
   await enter(page,'P7-Sat-2026!');
-
   await page.getByTestId('nav-fields').click();
   await page.getByRole('button',{name:'Novo talhão'}).click();
   let dialog=page.getByRole('dialog');
@@ -31,10 +30,9 @@ test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({pa
   dialog=page.getByRole('dialog');
   await dialog.getByLabel('Coordenadas do polígono').fill('-47.91,-21.22\n-47.89,-21.22\n-47.89,-21.20\n-47.91,-21.20');
   await dialog.getByRole('button',{name:'Salvar mapa do talhão',exact:true}).click();
-
   await page.getByTestId('nav-satellite').click();
   await expect(page.getByTestId('satellite-workspace')).toBeVisible();
-  await page.getByLabel('Talhão').selectOption({label:/Talhão Satélite/});
+  await page.getByLabel('Talhão').selectOption({label:'SAT-01 · Talhão Satélite'});
   await page.getByRole('button',{name:'Buscar imagens',exact:true}).click();
   await expect(page.getByText('Sentinel-2 · Copernicus').last()).toBeVisible();
   await expect(page.getByText('Nuvens: 4%')).toBeVisible();

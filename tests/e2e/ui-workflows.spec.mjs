@@ -67,8 +67,8 @@ test('financeiro registra despesa em reais com seletores agrícolas e atualiza o
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
   await expect(dialog.getByLabel('Valor (centavos)')).toHaveCount(0);
-  await dialog.getByLabel('Safra',{exact:true}).selectOption({label:'Soja 2026/27'});
-  await dialog.getByLabel('Talhão',{exact:true}).selectOption({label:'Fazenda Finance E2E > Talhão Finance E2E — 10 ha'});
+  await dialog.locator('#field-seasonId').selectOption({label:'Soja 2026/27'});
+  await dialog.locator('#field-fieldId').selectOption({label:'Fazenda Finance E2E > Talhão Finance E2E — 10 ha'});
   await dialog.getByLabel('Valor (R$)',{exact:true}).fill('1500.00');
   await dialog.getByLabel('Descrição',{exact:true}).fill('Adubação E2E');
   await dialog.getByLabel('Categoria',{exact:true}).fill('insumos');

@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {loadSqlMigrations,openProductPersistence} from '../shared/packages/vertical-persistence/src/index.js';
 import {createAgroLavouraPresentation} from '../src/presentation.js';
 import {createRpcBackend} from './backend.mjs';
+import {createSqliteIoTReadProvider} from './iot-provider.mjs';
 
 const PRODUCT_ID='agro-lavoura';
 const DATABASE_FILE='artisys-safras-talhoes.sqlite';
@@ -78,6 +79,7 @@ export async function createStandaloneHost({dataDir,backupDir=join(dataDir,'back
     }
   });
   const presentation=createAgroLavouraPresentation({persistence,recovery});
-  const backend=createRpcBackend({presentation});
-  return Object.freeze({productId:PRODUCT_ID,dbPath,backupDir,persistence,recovery,presentation,backend,async close(){const old=current;current=null;await old?.close?.();}});
+  const iot=createSqliteIoTReadProvider({dbPath});
+  const backend=createRpcBackend({presentation,iot});
+  return Object.freeze({productId:PRODUCT_ID,dbPath,backupDir,persistence,recovery,presentation,iot,backend,async close(){const old=current;current=null;await old?.close?.();}});
 }

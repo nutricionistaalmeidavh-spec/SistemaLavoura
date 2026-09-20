@@ -1,10 +1,16 @@
+labels:
+  platform: windows/amd64
+  backend: local
+
 when:
-  event: [push, pull_request, manual]
+  - event: [push, pull_request, manual]
+
 steps:
-  verify:
-    image: node:22-bookworm
+  - name: verify
+    image: powershell.exe
     commands:
-      - npm install --no-audit --no-fund
-      - npx playwright install --with-deps chromium
-      - npm run phase5
-      - npm run compat:contract
+      - '$ErrorActionPreference = "Stop"'
+      - 'npm install --no-audit --no-fund'
+      - 'npx playwright install chromium'
+      - 'npm run phase5'
+      - 'npm run compat:contract'

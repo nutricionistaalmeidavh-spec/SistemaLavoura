@@ -49,8 +49,9 @@ test('P4 field snapshot exposes pending operations, observations and offline sta
   assert.equal(snapshot.pendingSync.length,1);
 });
 
-test('P5 derives farm bounds from local field polygons',()=>{
+test('P5 derives farm bounds only from that farm local field polygons',()=>{
   assert.deepEqual(farmBoundsFromGeometries({farmUnitId:'farm-1',fields:[field],geometries:[geometry]}),[-47.91,-21.22,-47.89,-21.20]);
+  assert.throws(()=>farmBoundsFromGeometries({farmUnitId:'farm-2',fields:[field],geometries:[geometry]}),/no mapped field polygons/i);
 });
 
 test('P5 validates manifest contract and builds farm-only extraction profiles',()=>{
@@ -78,10 +79,12 @@ test('P4/P5 UI wiring includes field mode, offline maps and PWA registration',()
   const main=fs.readFileSync(new URL('../web/main.jsx',import.meta.url),'utf8');
   const index=fs.readFileSync(new URL('../web/index.html',import.meta.url),'utf8');
   const presentation=fs.readFileSync(new URL('../src/presentation-p5.js',import.meta.url),'utf8');
+  const fieldMode=fs.readFileSync(new URL('../web/ui/field-mode.jsx',import.meta.url),'utf8');
   assert.match(runtime,/LavouraFieldMode/);
   assert.match(runtime,/LavouraOfflineMaps/);
   assert.match(main,/registerPwa/);
   assert.match(index,/manifest\.webmanifest/);
   assert.match(presentation,/field-mode/);
   assert.match(presentation,/offline-maps/);
+  assert.doesNotMatch(fieldMode,/seasonId:.*['"]field-mode['"]/);
 });

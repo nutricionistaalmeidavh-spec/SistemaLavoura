@@ -17,9 +17,9 @@ export function createAgroLavouraPresentation(options={}){
     id:'gis-import',title:'Importação GIS',kind:'gis-import',
     actions:Object.freeze({
       saveLayer:async({layer,expectedVersion=0}={})=>gisLayers.save(layer,{expectedVersion}),
-      removeLayer:async({id,expectedVersion}={})=>gisLayers.remove(id,{expectedVersion}),
+      removeLayer:async({id,expectedVersion}={})=>{const current=await gisLayers.get(id);if(!current)return null;return gisLayers.remove(id,{expectedVersion:expectedVersion??current.version});},
       applyFieldGeometry:async({layerId,featureIndex,fieldId,expectedVersion}={})=>{
-        const layerRecord=await gisLayers.get(layerId);if(!layerRecord)throw new Error('Camada GIS não encontrada.');
+        const [layerRecord,fieldRecord]=await Promise.all([gisLayers.get(layerId),base.services.repos.fields.get(fieldId)]);if(!layerRecord)throw new Error('Camada GIS não encontrada.');if(!fieldRecord)throw new Error('Talhão não encontrado.');
         const index=Number(featureIndex);if(!Number.isInteger(index)||index<0)throw new TypeError('Selecione uma feição GIS válida.');
         const feature=layerRecord.payload?.featureCollection?.features?.[index];if(!feature)throw new RangeError('Feição GIS não encontrada.');
         const current=await base.services.repos.fieldGeometries.get(fieldId);

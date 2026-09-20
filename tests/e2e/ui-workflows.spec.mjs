@@ -50,7 +50,7 @@ test('estoque registra entrada por formulário estruturado e insumo legível',as
   await page.getByRole('button',{name:'Registrar entrada'}).click();
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('ID do movimento')).toHaveCount(0);
-  await dialog.getByLabel('Insumo',{exact:true}).selectOption({label:'NPK E2E (kg)'});
+  await dialog.locator('#field-sku').selectOption({label:'NPK E2E (kg)'});
   await dialog.getByLabel('Quantidade',{exact:true}).fill('25');
   await dialog.getByLabel('Lote',{exact:true}).fill('LOT-E2E');
   await dialog.getByRole('button',{name:'Registrar entrada',exact:true}).click();

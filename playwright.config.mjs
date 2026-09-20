@@ -2,6 +2,7 @@ import {defineConfig} from '@playwright/test';
 
 export default defineConfig({
   testDir:'./tests/e2e',
+  outputDir:'qa-artifacts/playwright-results',
   timeout:30000,
   workers:process.env.CI?1:undefined,
   use:{

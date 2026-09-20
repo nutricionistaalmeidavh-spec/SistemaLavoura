@@ -4,9 +4,9 @@
 
 **Goal:** Harden the existing offline-map/GIS stack so interrupted installs, corrupt packages, low disk, malformed geometry, cross-state farms, and large datasets fail safely without breaking P0-P7 or adding a mandatory paid/cloud dependency.
 
-**Architecture:** Extend the current `map-package-manager`, planner, GIS domain, agricultural read model, and offline-map UI in place. Filesystem package replacement becomes journaled/recoverable, installed packages gain local integrity metadata and health states, GIS boundaries gain strict topology checks, and agricultural-map relationship lookups become indexed rather than repeatedly filtered. P8 remains additive: field data and PWA mode continue working even when no basemap is installed.
+**Architecture:** Extend the existing `map-package-manager`, planner, GIS domain, agricultural read model, presentation layer, and offline-map UI in place. Package replacement becomes journaled and recoverable, installed packages gain local integrity metadata and health states, GIS boundaries gain strict topology checks, and agricultural-map relationship lookups become indexed. Existing manual field polygons remain compatible: a valid unclosed stored ring may be closed in memory for validation/rendering, but persisted legacy data is never silently rewritten.
 
-**Tech Stack:** Node.js 22 ESM, Electron 44, React 19, local filesystem/SQLite architecture already present, PMTiles CLI v1.31.2, Playwright 1.55, GitHub Actions Windows/Linux.
+**Tech Stack:** Node.js 22 ESM, Electron 44, React 19, PMTiles CLI v1.31.2, Playwright 1.55, GitHub Actions Linux/Windows.
 
 **Spec:** `docs/superpowers/specs/2026-09-20-p8-map-robustness-design.md`
 
@@ -15,75 +15,96 @@
 - Mandatory core remains local-first and R$0 to operate.
 - No paid API, ArtiSys server, mandatory account, or new cloud dependency.
 - Existing P0-P7 behavior and screen/action contracts remain compatible.
-- Installed map failures must never mutate agricultural domain data.
+- Installed map failures never mutate agricultural domain data.
 - A new/updated PMTiles file is never promoted before `pmtiles verify` succeeds.
-- Existing pre-P8 map metadata remains readable and is reported `unverified` until explicit verification.
-- Existing invalid legacy field geometry is surfaced, never silently rewritten.
-- No SQLite migration is required for P8 map-package transaction/integrity state.
+- Existing pre-P8 map metadata remains readable and is `unverified` until explicit verification.
+- Existing valid manual field geometry stored without a repeated closing point remains readable; P8 may close a copy in memory but must not rewrite it automatically.
+- Existing invalid legacy geometry is surfaced, never silently repaired in persistence.
+- No SQLite migration is required for map-package transaction/integrity state.
 - Node runtime floor remains `>=22`.
 - Windows automatic PMTiles extraction remains Windows x64 desktop only.
-- P6/P7 Playwright process isolation must be preserved.
+- P6/P7 Playwright process isolation remains intact.
 
 ## Review Focus
 
-1. **Damaged metadata JSON with an intact PMTiles file:** snapshot must surface an integrity/recovery state without deleting the file; Task 3 pins this case.
-2. **Backup exists but the transaction journal is incomplete or malformed:** reconciliation must not discard both candidates; Task 2 pins recovery precedence.
-3. **Farm bounds touch state-package boundaries exactly:** full-coverage logic must accept boundary contact only when the full rectangle remains covered; Task 4 pins edge-inclusive coverage.
-4. **Polygon with repeated vertices/collinear segments:** strict topology must reject truly degenerate/self-crossing rings without rejecting a valid ring solely for redundant collinear points; Task 5 pins both cases.
-5. **PWA/mobile with no desktop provider after P8 UI changes:** field mode remains usable and offline-map controls remain non-destructive/disabled; Task 6 and Task 7 pin this fallback.
+1. **Damaged metadata JSON with intact PMTiles:** do not delete the map file; surface a recovery/integrity issue.
+2. **Malformed transaction journal with backup present:** never delete both candidates; preserve evidence and fail closed.
+3. **Farm bounds touching package edges:** exact shared edges are accepted only when the entire farm rectangle is covered.
+4. **Redundant collinear polygon vertices:** valid shape stays valid, while zero-area and self-crossing rings fail.
+5. **PWA/mobile without desktop provider:** field mode remains usable and package-management actions remain unavailable/non-destructive.
 
 ---
 
-### Task 1: Stable map-package errors and strict catalog refresh
+### Task 1: Stable errors and strict catalog refresh
 
 **Files:**
 - Modify: `runtime/map-package-manager.mjs`
-- Test: `tests/p8-map-robustness.test.js`
+- Create: `tests/p8-map-robustness.test.js`
 - Extend: `tests/map-package-manager.test.js`
 
 **Interfaces:**
-- Produces: `MapPackageError extends Error` with `{code, retryable, cause}`.
-- Produces: `normalizeMapPackageError(error, fallbackCode)` returning `MapPackageError`.
-- Reuses: `validateMapManifest(input)` from `src/map-package-planner.js`.
-- `refreshCatalog(url?)` must preserve the previous cached/on-disk valid catalog when the remote fetch/validation fails.
+- Produces `MapPackageError(code,message,{retryable,cause})`.
+- Produces `normalizeMapPackageError(error,fallbackCode)`.
+- Reuses `validateMapManifest(input)` from `src/map-package-planner.js`.
+- `refreshCatalog(url?)` validates the complete manifest before replacing cache/disk state.
 
-- [ ] **Step 1: Write the failing error-model tests**
+- [ ] **Step 1: Write the RED tests**
 
-Add to `tests/p8-map-robustness.test.js`:
+Create `tests/p8-map-robustness.test.js` with these initial imports and tests:
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MapPackageError,normalizeMapPackageError} from '../runtime/map-package-manager.mjs';
+import {mkdtemp} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {createMapPackageManager,MapPackageError,normalizeMapPackageError} from '../runtime/map-package-manager.mjs';
 
-test('P8 normalizes disk, network and verification errors into stable map codes',()=>{
-  const disk=normalizeMapPackageError(Object.assign(new Error('no space'),{code:'ENOSPC'}),'MAP_EXTRACT_FAILED');
-  assert.ok(disk instanceof MapPackageError);
-  assert.equal(disk.code,'MAP_DISK_FULL');
-  assert.equal(disk.retryable,true);
-  const verify=normalizeMapPackageError(new Error('verify failed'),'MAP_VERIFY_FAILED');
-  assert.equal(verify.code,'MAP_VERIFY_FAILED');
+const validManifest={
+  schemaVersion:1,
+  releaseVersion:'2026.09.1',
+  generatedAt:'2026-09-20T12:00:00Z',
+  source:{provider:'Protomaps Basemap daily build',license:'ODbL-1.0'},
+  maps:[{id:'sp',name:'São Paulo',kind:'state',available:true,version:'2026.09.1',asset:'sp.pmtiles',size:1000,sha256:'a'.repeat(64),minZoom:7,maxZoom:14,bounds:[-53.2,-25.4,-44.1,-19.7],sourceDate:'2026-09-20'}]
+};
+
+test('P8 normalizes ENOSPC into a stable retryable map error',()=>{
+  const error=normalizeMapPackageError(Object.assign(new Error('no space'),{code:'ENOSPC'}),'MAP_EXTRACT_FAILED');
+  assert.ok(error instanceof MapPackageError);
+  assert.equal(error.code,'MAP_DISK_FULL');
+  assert.equal(error.retryable,true);
+});
+
+test('P8 preserves last valid cached catalog when a refresh is invalid',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-catalog-'));
+  let mode='valid';
+  const fetchImpl=async()=>({ok:true,status:200,async json(){return mode==='valid'?validManifest:{schemaVersion:99,maps:[]};}});
+  const manager=createMapPackageManager({dataDir,platform:'win32',arch:'x64',fetchImpl});
+  await manager.refreshCatalog('https://example.test/maps-manifest.json');
+  mode='invalid';
+  await assert.rejects(()=>manager.refreshCatalog('https://example.test/maps-manifest.json'),error=>error.code==='MAP_CATALOG_INVALID');
+  const reopened=createMapPackageManager({dataDir,platform:'win32',arch:'x64',fetchImpl});
+  const snapshot=await reopened.snapshot();
+  assert.equal(snapshot.catalogVersion,'2026.09.1');
 });
 ```
 
-Add a catalog-preservation test using a temp `dataDir`: first return one valid manifest, call `refreshCatalog()`, then return malformed JSON/manifest and assert rejection code `MAP_CATALOG_INVALID`; a new manager over the same `dataDir` must still expose the prior `catalogVersion` in `snapshot()`.
-
-- [ ] **Step 2: Run the RED tests**
-
-Run:
+- [ ] **Step 2: Run RED**
 
 ```bash
 node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js
 ```
 
-Expected: FAIL because `MapPackageError`/`normalizeMapPackageError` do not exist and `refreshCatalog()` still accepts only shallow shape validation.
+Expected: FAIL because `MapPackageError` and `normalizeMapPackageError` do not exist and `refreshCatalog()` does not semantically validate the full manifest.
 
-- [ ] **Step 3: Implement the stable error boundary**
+- [ ] **Step 3: Implement stable errors and semantic catalog validation**
 
-In `runtime/map-package-manager.mjs`, import `validateMapManifest` and add:
+In `runtime/map-package-manager.mjs` add:
 
 ```js
-export class MapPackageError extends Error {
+import {validateMapManifest} from '../src/map-package-planner.js';
+
+export class MapPackageError extends Error{
   constructor(code,message,{retryable=false,cause=null}={}){
     super(message,{cause});
     this.name='MapPackageError';
@@ -95,31 +116,32 @@ export class MapPackageError extends Error {
 export function normalizeMapPackageError(error,fallbackCode='MAP_RECOVERY_FAILED'){
   if(error instanceof MapPackageError)return error;
   if(error?.code==='ENOSPC')return new MapPackageError('MAP_DISK_FULL','Espaço em disco insuficiente para concluir o mapa.',{retryable:true,cause:error});
-  return new MapPackageError(fallbackCode,error?.message||'Falha no gerenciamento do mapa.',{retryable:['MAP_CATALOG_UNAVAILABLE','MAP_SOURCE_UNAVAILABLE','MAP_EXTRACT_FAILED'].includes(fallbackCode),cause:error});
+  const retryable=new Set(['MAP_CATALOG_UNAVAILABLE','MAP_SOURCE_UNAVAILABLE','MAP_EXTRACT_FAILED']);
+  return new MapPackageError(fallbackCode,error?.message||'Falha no gerenciamento do mapa.',{retryable:retryable.has(fallbackCode),cause:error});
 }
 ```
 
-Wrap network/catalog boundaries with codes:
+Replace `refreshCatalog()` with:
 
 ```js
 async function refreshCatalog(url=DEFAULT_MANIFEST_URL){
   await init();
   let response;
-  try{response=await fetchImpl(url,{redirect:'follow'});}catch(error){throw normalizeMapPackageError(error,'MAP_CATALOG_UNAVAILABLE');}
+  try{response=await fetchImpl(url,{redirect:'follow'});}
+  catch(error){throw normalizeMapPackageError(error,'MAP_CATALOG_UNAVAILABLE');}
   if(!response.ok)throw new MapPackageError('MAP_CATALOG_UNAVAILABLE',`Catálogo de mapas indisponível (${response.status}).`,{retryable:true});
   let value;
-  try{value=validateMapManifest(await response.json());}catch(error){throw new MapPackageError('MAP_CATALOG_INVALID','O catálogo de mapas recebido é inválido.',{cause:error});}
-  catalogCache=value;
+  try{value=validateMapManifest(await response.json());}
+  catch(error){throw new MapPackageError('MAP_CATALOG_INVALID','O catálogo de mapas recebido é inválido.',{cause:error});}
   await atomicJson(catalogPath,value);
+  catalogCache=value;
   return value;
 }
 ```
 
-Do not overwrite `catalogPath` until semantic validation passes.
+Wrap source-resolution exhaustion in `MAP_SOURCE_UNAVAILABLE` and unsupported CLI runtime in `MAP_UNSUPPORTED_RUNTIME` without changing successful paths.
 
-- [ ] **Step 4: Run tests GREEN**
-
-Run:
+- [ ] **Step 4: Run GREEN**
 
 ```bash
 node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js
@@ -136,112 +158,175 @@ git commit -m "feat: add stable P8 map errors and catalog validation"
 
 ---
 
-### Task 2: Journaled package promotion and startup reconciliation
+### Task 2: Journaled promotion and interrupted-install recovery
 
 **Files:**
 - Modify: `runtime/map-package-manager.mjs`
-- Test: `tests/p8-map-robustness.test.js`
+- Extend: `tests/p8-map-robustness.test.js`
 - Extend: `tests/map-package-manager.test.js`
 
 **Interfaces:**
-- Produces internal journal path: `<packages>/<packageId>.transaction.json`.
-- Produces internal `reconcilePackages()` called by `init()` before listing/snapshot use.
-- Journal shape: `{version:1,id,finalFile,backupFile,tempFile,metadataFile,stage,startedAt}`.
-- Promotion stages are exactly: `verified-temp`, `backup-created`, `final-promoted`, `metadata-written`.
+- Transaction file: `<packages>/<id>.transaction.json`.
+- Shape: `{version:1,id,finalFile,backupFile,tempFile,metadataFile,stage,startedAt}`.
+- Stages: `verified-temp`, `backup-created`, `final-promoted`, `metadata-written`.
+- Internal `reconcilePackages()` runs once from `init()` after directories exist.
 
-- [ ] **Step 1: Write interrupted-update and stale-temp tests**
+- [ ] **Step 1: Add concrete RED recovery tests**
 
-Use real temp directories and fake CLI execution. Cover:
+Append imports:
 
 ```js
-test('P8 restores backup when interrupted after old final was moved away',async()=>{
-  // create final metadata + move the known-good PMTiles to .bak
-  // create transaction journal at stage "backup-created"
-  // construct a new manager and call snapshot()
-  // assert final PMTiles is restored, backup/journal removed, installed entry remains
+import {mkdir,writeFile,readFile,access} from 'node:fs/promises';
+```
+
+Add helper and tests:
+
+```js
+const exists=async path=>{try{await access(path);return true;}catch{return false;}};
+
+test('P8 restores known-good backup after interruption at backup-created',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-recover-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  const id='farm-farm-1-detailed';
+  const finalFile=`${id}.pmtiles`,backupFile=`${finalFile}.bak`,tempFile=`${finalFile}.part-1.pmtiles`;
+  await writeFile(join(packages,backupFile),'known-good');
+  await writeFile(join(packages,tempFile),'partial');
+  await writeFile(join(packages,`${id}.json`),JSON.stringify({id,fileName:finalFile,size:10,profile:'detailed'}));
+  await writeFile(join(packages,`${id}.transaction.json`),JSON.stringify({version:1,id,finalFile,backupFile,tempFile,metadataFile:`${id}.json`,stage:'backup-created',startedAt:'2026-09-20T12:00:00Z'}));
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  await manager.snapshot();
+  assert.equal(await readFile(join(packages,finalFile),'utf8'),'known-good');
+  assert.equal(await exists(join(packages,backupFile)),false);
+  assert.equal(await exists(join(packages,tempFile)),false);
+  assert.equal(await exists(join(packages,`${id}.transaction.json`)),false);
 });
 
-test('P8 keeps valid final and removes stale backup after interrupted metadata cleanup',async()=>{
-  // final + metadata + .bak + journal(stage:"metadata-written")
-  // snapshot() -> final remains, backup/journal disappear
+test('P8 preserves malformed recovery evidence instead of deleting a backup',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-bad-journal-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  await writeFile(join(packages,'farm-farm-1-detailed.pmtiles.bak'),'known-good');
+  await writeFile(join(packages,'farm-farm-1-detailed.transaction.json'),'{bad json');
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  const snapshot=await manager.snapshot();
+  assert.equal(await exists(join(packages,'farm-farm-1-detailed.pmtiles.bak')),true);
+  assert.equal(snapshot.recoveryIssues.length,1);
+  assert.equal(snapshot.recoveryIssues[0].code,'MAP_RECOVERY_FAILED');
 });
 
-test('P8 removes orphan .part files that are not referenced by an active transaction',async()=>{
-  // create farm-x.part-old.pmtiles
-  // snapshot(); assert file missing afterwards
+test('P8 removes orphan partial PMTiles not referenced by a transaction',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-orphan-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  const partial=join(packages,'farm-x.part-orphan.pmtiles');
+  await writeFile(partial,'partial');
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  await manager.snapshot();
+  assert.equal(await exists(partial),false);
 });
 ```
 
-Review Focus case: malformed journal + `.bak` must leave backup untouched and surface recovery failure rather than deleting it.
-
-- [ ] **Step 2: Run tests RED**
+- [ ] **Step 2: Run RED**
 
 ```bash
 node --test tests/p8-map-robustness.test.js
 ```
 
-Expected: FAIL because no reconciliation/journal mechanism exists.
+Expected: FAIL because reconciliation and `recoveryIssues` do not exist.
 
-- [ ] **Step 3: Implement transaction helpers and reconciliation**
+- [ ] **Step 3: Implement reconciliation**
 
-Add focused helpers inside `runtime/map-package-manager.mjs`:
+Inside `createMapPackageManager`, add:
 
 ```js
+let initialized=false;
+let recoveryIssues=[];
 const journalPath=id=>join(packages,`${id}.transaction.json`);
 const writeJournal=(id,value)=>atomicJson(journalPath(id),{version:1,id,...value});
+const localName=value=>{
+  const name=basename(String(value??''));
+  if(!name||name!==String(value))throw new MapPackageError('MAP_RECOVERY_FAILED','Registro de recuperação contém caminho inválido.');
+  return name;
+};
+```
 
-async function reconcileTransaction(record){
-  const finalPath=join(packages,basename(record.finalFile));
-  const backupPath=join(packages,basename(record.backupFile));
-  const tempPath=join(packages,basename(record.tempFile));
-  const metadataPath=join(packages,basename(record.metadataFile));
-  const finalExists=await exists(finalPath);
-  const backupExists=await exists(backupPath);
-  if(!finalExists&&backupExists)await rename(backupPath,finalPath);
-  else if(finalExists&&backupExists&&await exists(metadataPath))await rm(backupPath,{force:true});
-  await rm(tempPath,{force:true});
-  if(await exists(finalPath))await rm(journalPath(record.id),{force:true});
+Add:
+
+```js
+async function reconcilePackages(){
+  const {readdir}=await import('node:fs/promises');
+  recoveryIssues=[];
+  const names=await readdir(packages),referencedTemps=new Set();
+  for(const name of names.filter(value=>value.endsWith('.transaction.json'))){
+    const path=join(packages,name);
+    try{
+      const record=JSON.parse(await readFile(path,'utf8'));
+      if(record?.version!==1||!record.id)throw new Error('unsupported transaction journal');
+      const finalFile=localName(record.finalFile),backupFile=localName(record.backupFile),tempFile=localName(record.tempFile),metadataFile=localName(record.metadataFile);
+      referencedTemps.add(tempFile);
+      const finalPath=join(packages,finalFile),backupPath=join(packages,backupFile),tempPath=join(packages,tempFile),metadataPath=join(packages,metadataFile);
+      if(!(await exists(finalPath))&&await exists(backupPath))await rename(backupPath,finalPath);
+      if(await exists(finalPath)&&await exists(backupPath)&&await exists(metadataPath))await rm(backupPath,{force:true});
+      await rm(tempPath,{force:true});
+      if(await exists(finalPath))await rm(path,{force:true});
+      else recoveryIssues.push({code:'MAP_RECOVERY_FAILED',id:record.id,message:'Não foi possível restaurar o pacote offline.'});
+    }catch(error){recoveryIssues.push({code:'MAP_RECOVERY_FAILED',id:name.replace('.transaction.json',''),message:error.message});}
+  }
+  for(const name of names.filter(value=>/\.part-.*\.pmtiles$/.test(value)))if(!referencedTemps.has(name))await rm(join(packages,name),{force:true});
 }
 ```
 
-`reconcilePackages()` must:
-
-1. enumerate `*.transaction.json`;
-2. parse each fail-closed;
-3. reconcile only valid version-1 journals whose basenames remain inside `packages`;
-4. keep malformed journal/backup evidence and record a recovery issue rather than deleting it;
-5. remove orphan `.part-*.pmtiles` not referenced by a valid journal.
-
-Make `init()` idempotently call reconciliation once per manager instance after directories exist.
-
-Change `installFarmMap()` promotion to:
+Make `init()` call reconciliation once:
 
 ```js
-await writeJournal(recordId,{stage:'verified-temp',finalFile:basename(finalPath),backupFile:basename(backupPath),tempFile:basename(tempPath),metadataFile:`${recordId}.json`,startedAt:new Date().toISOString()});
+async function init(){
+  await Promise.all([mkdir(tools,{recursive:true}),mkdir(packages,{recursive:true})]);
+  if(!initialized){initialized=true;await reconcilePackages();}
+}
+```
+
+Expose `recoveryIssues:Object.freeze([...recoveryIssues])` from `snapshot()`.
+
+- [ ] **Step 4: Journal the promotion sequence**
+
+Before replacing the final file define:
+
+```js
+const recordId=`farm-${safeId(input.farmUnitId)}-${profile}`;
+const metadataPath=join(packages,`${recordId}.json`);
+const backupPath=`${finalPath}.bak`;
+const journalBase={finalFile:basename(finalPath),backupFile:basename(backupPath),tempFile:basename(tempPath),metadataFile:basename(metadataPath),startedAt:new Date().toISOString()};
+```
+
+Use:
+
+```js
+await writeJournal(recordId,{...journalBase,stage:'verified-temp'});
 if(await exists(finalPath)){
   await rm(backupPath,{force:true});
   await rename(finalPath,backupPath);
-  await writeJournal(recordId,{...journal,'stage':'backup-created'});
+  await writeJournal(recordId,{...journalBase,stage:'backup-created'});
 }
 await rename(tempPath,finalPath);
-await writeJournal(recordId,{...journal,'stage':'final-promoted'});
+await writeJournal(recordId,{...journalBase,stage:'final-promoted'});
 await atomicJson(metadataPath,record);
-await writeJournal(recordId,{...journal,'stage':'metadata-written'});
+await writeJournal(recordId,{...journalBase,stage:'metadata-written'});
 await rm(backupPath,{force:true});
 await rm(journalPath(recordId),{force:true});
 ```
 
-Normalize any `ENOSPC` arising in extraction/promotion/metadata write to `MAP_DISK_FULL`. In the catch path restore `.bak` when final is absent; do not delete a known-good final.
+Normalize any `ENOSPC` from extraction/promotion/metadata write to `MAP_DISK_FULL`; restore `.bak` only when final is absent.
 
-- [ ] **Step 4: Run focused tests GREEN**
+- [ ] **Step 5: Run GREEN**
 
 ```bash
 node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js
 ```
 
-Expected: PASS including malformed-journal preservation and stale-temp cleanup.
+Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add runtime/map-package-manager.mjs tests/p8-map-robustness.test.js tests/map-package-manager.test.js
@@ -250,41 +335,51 @@ git commit -m "feat: recover interrupted offline map installs"
 
 ---
 
-### Task 3: Local integrity metadata, health states, and explicit verification
+### Task 3: Integrity metadata, health states, and explicit verification
 
 **Files:**
 - Modify: `runtime/map-package-manager.mjs`
 - Modify: `src/presentation-p5.js`
-- Test: `tests/p8-map-robustness.test.js`
+- Extend: `tests/p8-map-robustness.test.js`
 - Extend: `tests/map-package-manager.test.js`
+- Extend: `tests/p4-p5-field-offline.test.js`
 
 **Interfaces:**
-- Produces metadata fields: `metadataVersion:1`, `sha256`, `verifiedAt`, `catalogVersion`.
-- Produces `verifyFarmMap({id}) -> {id,health,size,sha256,verifiedAt,...}`.
-- `snapshot().installed[]` gains `health` in `healthy|unverified|missing|corrupt|outdated`.
-- `offline-maps` screen gains action `verifyFarmMap`.
+- Metadata v1 adds `metadataVersion`, `sha256`, `verifiedAt`, `catalogVersion`.
+- `verifyFarmMap({id})` returns a package record with `health`.
+- Health enum: `healthy|unverified|missing|corrupt|outdated`.
+- `snapshot().installed[]` includes health without hashing every file.
+- `offline-maps` gains action `verifyFarmMap`.
 
-- [ ] **Step 1: Write health and verification tests**
+- [ ] **Step 1: Add concrete health tests**
 
-Add tests for:
+Append:
 
 ```js
-test('P8 reports legacy package unverified then upgrades metadata after explicit verification',async()=>{
-  // legacy metadata has no metadataVersion/sha256
-  // snapshot -> health === 'unverified'
-  // verifyFarmMap -> fake CLI verify succeeds, local sha computed, metadataVersion === 1, health === 'healthy'
-});
-
-test('P8 reports missing and corrupt packages without deleting metadata automatically',async()=>{
-  // missing file -> health missing
-  // wrong file size/hash -> health corrupt
-  // assert metadata remains present
+test('P8 upgrades legacy metadata only after explicit verification',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-legacy-'));
+  const packages=join(dataDir,'maps','packages'),cliDir=join(dataDir,'maps','tools','pmtiles-1.31.2');
+  await mkdir(packages,{recursive:true});await mkdir(cliDir,{recursive:true});
+  await writeFile(join(cliDir,'pmtiles.exe'),'fake-cli');
+  await writeFile(join(packages,'farm-farm-1-detailed.pmtiles'),'legacy-map');
+  await writeFile(join(packages,'farm-farm-1-detailed.json'),JSON.stringify({id:'farm-farm-1-detailed',farmUnitId:'farm-1',profile:'detailed',fileName:'farm-farm-1-detailed.pmtiles',size:10}));
+  const manager=createMapPackageManager({dataDir,platform:'win32',arch:'x64',execFileImpl:async()=>({stdout:'',stderr:''}),fetchImpl:async()=>{throw new Error('offline');}});
+  assert.equal((await manager.snapshot()).installed[0].health,'unverified');
+  const verified=await manager.verifyFarmMap({id:'farm-farm-1-detailed'});
+  assert.equal(verified.health,'healthy');
+  const metadata=JSON.parse(await readFile(join(packages,'farm-farm-1-detailed.json'),'utf8'));
+  assert.equal(metadata.metadataVersion,1);
+  assert.match(metadata.sha256,/^[a-f0-9]{64}$/);
 });
 ```
 
-Review Focus: invalid metadata JSON next to an intact PMTiles file must not delete the PMTiles; `snapshot()` records a recovery/integrity issue and leaves the file in place.
+Add separate temp-dir tests for:
+- metadata present/file absent -> `missing`;
+- metadata SHA/size for original file then file modified -> `corrupt` after `verifyFarmMap()`;
+- invalid metadata JSON plus intact `.pmtiles` -> PMTiles remains and `recoveryIssues` contains one integrity/recovery issue;
+- cached catalog `2026.09.2` plus metadata `catalogVersion:'2026.09.1'` -> `outdated` while the package remains listed.
 
-Add an `outdated` test: cached catalog version/sourceDate newer than metadata -> health `outdated`, but the package remains listed and usable.
+Each test must create the exact metadata/file paths under `<dataDir>/maps/packages` and assert the files remain after snapshot/verification.
 
 - [ ] **Step 2: Run RED**
 
@@ -292,9 +387,9 @@ Add an `outdated` test: cached catalog version/sourceDate newer than metadata ->
 node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js
 ```
 
-Expected: FAIL because installed records have no health/verification API.
+Expected: FAIL because health/verification do not exist.
 
-- [ ] **Step 3: Implement streaming SHA and cheap snapshot health**
+- [ ] **Step 3: Add streaming SHA and release comparison**
 
 Add:
 
@@ -302,49 +397,68 @@ Add:
 async function sha256File(path){
   const {createReadStream}=await import('node:fs');
   return new Promise((resolveDigest,reject)=>{
-    const hash=createHash('sha256');
-    const stream=createReadStream(path);
+    const hash=createHash('sha256'),stream=createReadStream(path);
     stream.on('data',chunk=>hash.update(chunk));
     stream.on('error',reject);
     stream.on('end',()=>resolveDigest(hash.digest('hex')));
   });
 }
+function releaseParts(value){const match=/^(\d{4})\.(\d{2})\.(\d+)$/.exec(String(value??''));return match?[Number(match[1]),Number(match[2]),Number(match[3])]:null;}
+function newerRelease(candidate,current){const a=releaseParts(candidate),b=releaseParts(current);if(!a||!b)return false;for(let i=0;i<3;i+=1)if(a[i]!==b[i])return a[i]>b[i];return false;}
 ```
 
-On successful install, compute SHA after `pmtiles verify` and before promotion, then persist:
+After PMTiles temp verification, compute SHA before promotion and include:
 
 ```js
 metadataVersion:1,
-sha256:digest,
+sha256:await sha256File(tempPath),
 verifiedAt:new Date().toISOString(),
 catalogVersion:catalogCache?.releaseVersion??null
 ```
 
-`installed()` must perform only cheap checks by default: metadata parse, file existence, `stat().size`, metadata-version/hash presence, and cached catalog freshness. Do not hash multi-GB files on every load.
+- [ ] **Step 4: Implement cheap snapshot health and explicit verification**
 
-`verifyFarmMap({id})` must:
-
-1. load metadata safely;
-2. require file existence or return `missing`;
-3. run PMTiles CLI `verify`;
-4. stream SHA-256;
-5. compare to existing SHA when present;
-6. upgrade legacy metadata only after verification succeeds;
-7. return `corrupt` without deleting file/metadata when CLI/hash fails.
-
-- [ ] **Step 4: Wire presentation action**
-
-In `src/presentation-p5.js`, add:
+For each valid metadata record in `installed()` derive health without hashing:
 
 ```js
-const verifyMapDefinition=Object.freeze({
-  name:'verifyFarmMap',label:'Verificar integridade',
-  description:'Verifica o pacote PMTiles local sem alterar dados agrícolas.',
-  intent:'secondary',confirm:null,requiresSelection:true,fields:Object.freeze([])
-});
+if(!fileExists)health='missing';
+else if(metadata.metadataVersion!==1||!metadata.sha256)health='unverified';
+else if(actualSize!==metadata.size)health='corrupt';
+else if(newerRelease(catalogCache?.releaseVersion,metadata.catalogVersion))health='outdated';
+else health='healthy';
 ```
 
-Add action:
+Implement:
+
+```js
+async function verifyFarmMap({id}={}){
+  await init();
+  const clean=safeId(id),metadataPath=join(packages,`${clean}.json`);
+  if(!(await exists(metadataPath)))throw new MapPackageError('MAP_PACKAGE_MISSING','Metadados do mapa local não foram encontrados.');
+  const metadata=JSON.parse(await readFile(metadataPath,'utf8')),filePath=join(packages,basename(metadata.fileName));
+  if(!(await exists(filePath)))return Object.freeze({...metadata,health:'missing'});
+  const cli=await ensureCli();
+  try{await execFileImpl(cli,['verify',filePath],{windowsHide:true,maxBuffer:8*1024*1024});}
+  catch(error){return Object.freeze({...metadata,health:'corrupt',errorCode:'MAP_PACKAGE_CORRUPT'});}
+  const info=await stat(filePath),digest=await sha256File(filePath);
+  if(metadata.sha256&&metadata.sha256!==digest)return Object.freeze({...metadata,health:'corrupt',errorCode:'MAP_PACKAGE_CORRUPT'});
+  const upgraded={...metadata,metadataVersion:1,size:info.size,sha256:digest,verifiedAt:new Date().toISOString(),catalogVersion:metadata.catalogVersion??catalogCache?.releaseVersion??null};
+  await atomicJson(metadataPath,upgraded);
+  return Object.freeze({...upgraded,health:newerRelease(catalogCache?.releaseVersion,upgraded.catalogVersion)?'outdated':'healthy'});
+}
+```
+
+Expose `verifyFarmMap` from the manager.
+
+- [ ] **Step 5: Wire presentation action**
+
+In `src/presentation-p5.js` add:
+
+```js
+const verifyMapDefinition=Object.freeze({name:'verifyFarmMap',label:'Verificar integridade',description:'Verifica o pacote PMTiles local sem alterar dados agrícolas.',intent:'secondary',confirm:null,requiresSelection:true,fields:Object.freeze([])});
+```
+
+Add:
 
 ```js
 verifyFarmMap:input=>{
@@ -353,9 +467,9 @@ verifyFarmMap:input=>{
 }
 ```
 
-and expose the definition next to install/remove.
+and include `verifyFarmMap:verifyMapDefinition` in `actionDefinitions`.
 
-- [ ] **Step 5: Run GREEN**
+- [ ] **Step 6: Run GREEN**
 
 ```bash
 node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js tests/p4-p5-field-offline.test.js
@@ -363,7 +477,7 @@ node --test tests/p8-map-robustness.test.js tests/map-package-manager.test.js te
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add runtime/map-package-manager.mjs src/presentation-p5.js tests/p8-map-robustness.test.js tests/map-package-manager.test.js tests/p4-p5-field-offline.test.js
@@ -377,29 +491,26 @@ git commit -m "feat: verify offline map package integrity"
 **Files:**
 - Modify: `src/map-package-planner.js`
 - Extend: `tests/p4-p5-field-offline.test.js`
-- Test: `tests/p8-map-robustness.test.js`
+- Extend: `tests/p8-map-robustness.test.js`
 
 **Interfaces:**
-- Produces internal/exported `boundsFullyCovered(targetBounds, sourceBounds[]) -> boolean` for deterministic testability.
-- `buildFarmMapDownloadPlan()` keeps existing result shape but throws when available state bounds do not cover the entire farm rectangle.
-- `sources` remains stable in manifest order.
+- Produces `boundsFullyCovered(targetBounds,sourceBounds) -> boolean`.
+- `buildFarmMapDownloadPlan()` keeps its existing return shape and manifest order for `sources`.
 
-- [ ] **Step 1: Write full-coverage tests**
+- [ ] **Step 1: Add RED coverage tests**
 
-Create a manifest fixture with two adjacent state bounds and a farm spanning both.
+Append:
 
 ```js
-test('P8 accepts a farm fully covered by two adjacent state packages',()=>{
-  const plan=buildFarmMapDownloadPlan({/* farm spans left+right package */});
-  assert.deepEqual(plan.sources.map(item=>item.id),['left','right']);
-});
+import {boundsFullyCovered} from '../src/map-package-planner.js';
 
-test('P8 rejects partial multi-state coverage even when one package intersects',()=>{
-  assert.throws(()=>buildFarmMapDownloadPlan({/* right state unavailable */}),/complete map coverage/i);
+test('P8 covers a farm rectangle with two adjacent state bounds including shared edges',()=>{
+  assert.equal(boundsFullyCovered([0,0,2,1],[[0,0,1,1],[1,0,2,1]]),true);
+  assert.equal(boundsFullyCovered([0,0,2,1],[[0,0,1,1]]),false);
 });
 ```
 
-Review Focus: a farm whose `maxLongitude` equals one package's `maxLongitude` must be accepted when all other edges are covered; add an exact-edge case.
+Add a `buildFarmMapDownloadPlan()` test using two synthetic available state entries `left` and `right`, with bounds `[0,0,1,1]` and `[1,0,2,1]`, and a farm polygon spanning `[0.25,0.25,1.75,0.75]`. Assert `sources.map(source=>source.id)` equals `['left','right']`. Clone the manifest with `right.available=false` and assert `/complete map coverage/i`.
 
 - [ ] **Step 2: Run RED**
 
@@ -407,34 +518,33 @@ Review Focus: a farm whose `maxLongitude` equals one package's `maxLongitude` mu
 node --test tests/p4-p5-field-offline.test.js tests/p8-map-robustness.test.js
 ```
 
-Expected: partial coverage currently produces a plan instead of failing.
+Expected: FAIL because `boundsFullyCovered` does not exist and partial intersecting coverage is accepted.
 
-- [ ] **Step 3: Implement rectangle union coverage**
+- [ ] **Step 3: Implement rectangle-union coverage**
 
-Implement deterministic interval sweep without GIS dependencies:
+Add:
 
 ```js
 export function boundsFullyCovered(target,sources){
+  if(!validBounds(target)||!Array.isArray(sources)||!sources.length)return false;
   const [minX,minY,maxX,maxY]=target;
-  const xs=[minX,maxX,...sources.flatMap(b=>[Math.max(minX,b[0]),Math.min(maxX,b[2])])]
-    .filter(x=>x>=minX&&x<=maxX).sort((a,b)=>a-b);
-  const cuts=[...new Set(xs)];
+  const clipped=sources.filter(validBounds).map(b=>[Math.max(minX,b[0]),Math.max(minY,b[1]),Math.min(maxX,b[2]),Math.min(maxY,b[3])]).filter(b=>b[0]<=b[2]&&b[1]<=b[3]);
+  const cuts=[...new Set([minX,maxX,...clipped.flatMap(b=>[b[0],b[2]])])].sort((a,b)=>a-b);
+  if(cuts[0]!==minX||cuts.at(-1)!==maxX)return false;
   for(let i=0;i<cuts.length-1;i+=1){
     const left=cuts[i],right=cuts[i+1];
     if(right<=left)continue;
-    const mid=(left+right)/2;
-    const ys=sources.filter(b=>b[0]<=mid&&b[2]>=mid)
-      .map(b=>[Math.max(minY,b[1]),Math.min(maxY,b[3])])
-      .filter(([a,z])=>z>=a).sort((a,b)=>a[0]-b[0]);
+    const x=(left+right)/2;
+    const intervals=clipped.filter(b=>b[0]<=x&&b[2]>=x).map(b=>[b[1],b[3]]).sort((a,b)=>a[0]-b[0]);
     let cursor=minY;
-    for(const [a,z] of ys){if(a>cursor+1e-10)break;cursor=Math.max(cursor,z);}
+    for(const [start,end] of intervals){if(start>cursor+1e-10)break;cursor=Math.max(cursor,end);}
     if(cursor<maxY-1e-10)return false;
   }
-  return cuts[0]===minX&&cuts.at(-1)===maxX;
+  return true;
 }
 ```
 
-After selecting `states`, call:
+After selecting `states`:
 
 ```js
 if(!boundsFullyCovered(bounds,states.map(map=>map.bounds)))throw new Error('Available map packages do not provide complete map coverage for this farm.');
@@ -457,138 +567,188 @@ git commit -m "feat: require complete multi-state map coverage"
 
 ---
 
-### Task 5: Strict GIS topology and linear agricultural-map assembly
+### Task 5: Strict GIS topology and scalable agricultural read model
 
 **Files:**
 - Modify: `src/gis-import.js`
 - Modify: `src/agricultural-map.js`
 - Extend: `tests/p6-gis-import.test.js`
-- Extend/Create: `tests/p8-map-robustness.test.js`
+- Extend: `tests/p3-agricultural-map.test.js`
+- Extend: `tests/p8-map-robustness.test.js`
 
 **Interfaces:**
-- Produces/export `validatePolygonRingTopology(ring,path)` used by `normalizeGisGeometry()`.
-- Agricultural snapshot keeps current shape and adds `unmappedFields[].invalidGeometry` when applicable.
-- No external GIS package is introduced for topology validation.
+- Produces `validatePolygonRingTopology(ring,path)` used by GIS normalization.
+- Stored manual Polygon rings may be closed in memory if first/last differ; persistence is unchanged.
+- `unmappedFields[]` gains `invalidGeometry:true` and `reason:'invalid-geometry'` for malformed stored geometry.
+- Relationship lookup becomes O(fields + related records), aside from geometry traversal/serialization.
 
-- [ ] **Step 1: Write topology RED tests**
+- [ ] **Step 1: Add GIS topology RED tests**
 
-Add to `tests/p6-gis-import.test.js`:
+In `tests/p6-gis-import.test.js` add:
 
 ```js
-test('P8 rejects bow-tie and zero-area field boundaries',()=>{
-  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[
-    [0,0],[2,2],[0,2],[2,0],[0,0]
-  ]]}),/self-intersect/i);
-  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[
-    [0,0],[1,0],[2,0],[0,0]
-  ]]}),/degenerate|area/i);
+test('P8 rejects self-intersecting and zero-area GIS polygons',()=>{
+  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[2,2],[0,2],[2,0],[0,0]]]}),/self-intersect/i);
+  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[1,0],[2,0],[0,0]]]}),/degenerate|area/i);
+});
+
+test('P8 accepts a valid ring with a redundant collinear vertex',()=>{
+  const geometry=normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[1,0],[2,0],[2,1],[0,1],[0,0]]]});
+  assert.equal(geometry.type,'Polygon');
 });
 ```
 
-Review Focus: add one valid polygon containing a redundant collinear vertex; it must normalize successfully.
+- [ ] **Step 2: Implement deterministic topology checks**
 
-- [ ] **Step 2: Implement topology validation**
-
-Add helpers to `src/gis-import.js`:
+In `src/gis-import.js` add:
 
 ```js
-const orientation=(a,b,c)=>Math.sign((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));
-const ringArea=ring=>Math.abs(ring.slice(0,-1).reduce((sum,p,i)=>{
-  const q=ring[(i+1)%(ring.length-1)];
-  return sum+p[0]*q[1]-q[0]*p[1];
-},0))/2;
-```
+const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+const between=(value,a,b)=>value>=Math.min(a,b)-1e-12&&value<=Math.max(a,b)+1e-12;
+const onSegment=(a,b,p)=>Math.abs(cross(a,b,p))<=1e-12&&between(p[0],a[0],b[0])&&between(p[1],a[1],b[1]);
+function segmentsIntersect(a,b,c,d){
+  const abC=cross(a,b,c),abD=cross(a,b,d),cdA=cross(c,d,a),cdB=cross(c,d,b);
+  if(((abC>0&&abD<0)||(abC<0&&abD>0))&&((cdA>0&&cdB<0)||(cdA<0&&cdB>0)))return true;
+  return onSegment(a,b,c)||onSegment(a,b,d)||onSegment(c,d,a)||onSegment(c,d,b);
+}
+const ringArea=ring=>Math.abs(ring.slice(0,-1).reduce((sum,p,index)=>{const q=ring[index+1];return sum+p[0]*q[1]-q[0]*p[1];},0))/2;
 
-Implement `validatePolygonRingTopology` to require three distinct non-closing vertices, `ringArea > 1e-14`, and reject intersections between non-adjacent segments. Adjacent segments and first/last shared endpoint are allowed.
-
-Call it from `validatePolygonStructure()` after closure validation.
-
-- [ ] **Step 3: Write legacy-geometry and large-fixture RED tests**
-
-In `tests/p8-map-robustness.test.js`:
-
-```js
-test('P8 degrades one malformed legacy geometry without losing valid fields',()=>{
-  const snapshot=buildAgriculturalMapSnapshot({
-    fields:[{id:'good'},{id:'bad'}],
-    geometries:[
-      {fieldId:'good',type:'Polygon',coordinates:[[0,0],[1,0],[1,1],[0,0]]},
-      {fieldId:'bad',type:'Polygon',coordinates:[[999,999],[1,0],[1,1]]}
-    ]
-  });
-  assert.equal(snapshot.fields.length,1);
-  assert.equal(snapshot.unmappedFields.find(item=>item.id==='bad').invalidGeometry,true);
-});
-```
-
-Large fixture: generate 5,000 fields/geometries plus one operation/scouting/rainfall record per field, call `buildAgriculturalMapSnapshot()`, assert `fields.length===5000`, summary counts remain correct, and elapsed time is below a generous `10_000ms` on CI. The implementation structure, not the exact timer, is the main regression guard.
-
-- [ ] **Step 4: Refactor agricultural-map lookup to indexes**
-
-Add a helper:
-
-```js
-function groupByField(records,key='fieldId'){
-  const map=new Map();
-  for(const record of records){
-    const id=String(record?.[key]??'');
-    if(!id)continue;
-    const bucket=map.get(id);if(bucket)bucket.push(record);else map.set(id,[record]);
+export function validatePolygonRingTopology(ring,path='ring'){
+  const unique=new Set(ring.slice(0,-1).map(point=>`${point[0]},${point[1]}`));
+  if(unique.size<3||ringArea(ring)<=1e-14)throw new TypeError(`${path} Polygon ring is degenerate.`);
+  const segmentCount=ring.length-1;
+  for(let i=0;i<segmentCount;i+=1){
+    for(let j=i+1;j<segmentCount;j+=1){
+      const adjacent=j===i+1||(i===0&&j===segmentCount-1);
+      if(adjacent)continue;
+      if(segmentsIntersect(ring[i],ring[i+1],ring[j],ring[j+1]))throw new TypeError(`${path} Polygon ring is self-intersecting.`);
+    }
   }
-  return map;
 }
 ```
 
-Prebuild indexes for scouting, field image files, rainfall, operations, applications, and geometries once. Replace per-field full-array `.filter()` scans with `index.get(String(field.id))??[]`.
+Call `validatePolygonRingTopology()` after ring-closure validation for every Polygon/MultiPolygon ring.
 
-Geometry normalization must become strict for stored field boundaries: any invalid WGS84 point/structure marks that field invalid rather than dropping only the bad point. Preserve rendering of valid records.
+- [ ] **Step 3: Add compatibility and large-fixture RED tests**
+
+In `tests/p8-map-robustness.test.js` import `buildAgriculturalMapSnapshot` and add:
+
+```js
+test('P8 keeps valid unclosed manual geometry readable without rewriting persistence',()=>{
+  const stored={fieldId:'f1',type:'Polygon',coordinates:[[0,0],[1,0],[1,1],[0,1]]};
+  const snapshot=buildAgriculturalMapSnapshot({fields:[{id:'f1',name:'Manual'}],geometries:[stored]});
+  assert.equal(snapshot.fields.length,1);
+  assert.deepEqual(stored.coordinates,[[0,0],[1,0],[1,1],[0,1]]);
+});
+
+test('P8 isolates malformed legacy geometry while valid fields continue rendering',()=>{
+  const snapshot=buildAgriculturalMapSnapshot({fields:[{id:'good'},{id:'bad'}],geometries:[{fieldId:'good',type:'Polygon',coordinates:[[0,0],[1,0],[1,1],[0,1]]},{fieldId:'bad',type:'Polygon',coordinates:[[999,999],[1,0],[1,1]]}]});
+  assert.equal(snapshot.fields.length,1);
+  const invalid=snapshot.unmappedFields.find(item=>item.id==='bad');
+  assert.equal(invalid.invalidGeometry,true);
+  assert.equal(invalid.reason,'invalid-geometry');
+});
+
+test('P8 builds a 5000-field snapshot with complete indexed summaries',()=>{
+  const count=5000;
+  const fields=Array.from({length:count},(_,i)=>({id:`f${i}`,areaHa:1}));
+  const geometries=Array.from({length:count},(_,i)=>({fieldId:`f${i}`,type:'Polygon',coordinates:[[i/10000,0],[i/10000+.00005,0],[i/10000+.00005,.00005],[i/10000,.00005]]}));
+  const operations=Array.from({length:count},(_,i)=>({id:`o${i}`,fieldId:`f${i}`,status:'planned'}));
+  const scouting=Array.from({length:count},(_,i)=>({id:`s${i}`,fieldId:`f${i}`,status:'open'}));
+  const started=Date.now();
+  const snapshot=buildAgriculturalMapSnapshot({fields,geometries,operations,scouting});
+  const elapsed=Date.now()-started;
+  assert.equal(snapshot.fields.length,count);
+  assert.equal(snapshot.fields[4321].summary.plannedOperations,1);
+  assert.equal(snapshot.fields[4321].summary.openScouting,1);
+  assert.ok(elapsed<10000,`elapsed=${elapsed}ms`);
+});
+```
+
+- [ ] **Step 4: Refactor stored-geometry normalization and indexes**
+
+In `src/agricultural-map.js` import `validatePolygonRingTopology` and replace permissive point dropping with:
+
+```js
+function strictStoredRing(raw){
+  if(!Array.isArray(raw)||raw.length<3)return null;
+  const ring=[];
+  for(const point of raw){
+    if(!Array.isArray(point)||point.length<2)return null;
+    const longitude=Number(point[0]),latitude=Number(point[1]);
+    if(!Number.isFinite(longitude)||!Number.isFinite(latitude)||longitude<-180||longitude>180||latitude<-90||latitude>90)return null;
+    ring.push([longitude,latitude]);
+  }
+  if(ring[0][0]!==ring.at(-1)[0]||ring[0][1]!==ring.at(-1)[1])ring.push([...ring[0]]);
+  try{validatePolygonRingTopology(ring,'stored field boundary');return Object.freeze(ring.map(point=>Object.freeze(point)));}
+  catch{return null;}
+}
+```
+
+Add:
+
+```js
+function groupByField(records,key='fieldId'){
+  const index=new Map();
+  for(const record of records){
+    const id=String(record?.[key]??'');
+    if(!id)continue;
+    if(index.has(id))index.get(id).push(record);else index.set(id,[record]);
+  }
+  return index;
+}
+```
+
+Pre-index scouting, image files, rainfall, operations, applications, and geometries before iterating fields. Use map lookups instead of per-field full-array `.filter()` scans. Invalid stored geometry adds an `unmappedFields` item with `{invalidGeometry:true,reason:'invalid-geometry'}`.
 
 - [ ] **Step 5: Run GREEN**
 
 ```bash
-node --test tests/p6-gis-import.test.js tests/p8-map-robustness.test.js tests/p3-agricultural-map.test.js
+node --test tests/p6-gis-import.test.js tests/p3-agricultural-map.test.js tests/p8-map-robustness.test.js
 ```
 
-Expected: PASS including 5,000-field fixture.
+Expected: PASS including current P3 manual geometry and the 5,000-field fixture.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/gis-import.js src/agricultural-map.js tests/p6-gis-import.test.js tests/p8-map-robustness.test.js tests/p3-agricultural-map.test.js
+git add src/gis-import.js src/agricultural-map.js tests/p6-gis-import.test.js tests/p3-agricultural-map.test.js tests/p8-map-robustness.test.js
 git commit -m "feat: harden GIS topology and large map snapshots"
 ```
 
 ---
 
-### Task 6: Package-health UI and actionable recovery states
+### Task 6: Package-health UI and PWA-safe recovery guidance
 
 **Files:**
 - Modify: `web/ui/offline-maps.jsx`
-- Modify: `web/ui/offline-maps.css` if health badges require styles
+- Modify: `web/ui/offline-maps.css` only for health/status styles
 - Extend: `tests/p4-p5-field-offline.test.js`
-- Test: `tests/p8-map-robustness.test.js`
+- Extend: `tests/p8-map-robustness.test.js`
 
 **Interfaces:**
-- Consumes: `provider.installed[].health`, `verifyFarmMap` action, and `MapPackageError.code` transported through the existing RPC error message/object boundary.
-- Produces: health labels in Portuguese and explicit `Verificar integridade` action for installed desktop packages.
+- Consumes `provider.installed[].health` and `verifyFarmMap`.
+- Desktop packages expose `Verificar integridade`.
+- PWA/mobile leaves install/verify unavailable while field mode remains usable.
 
-- [ ] **Step 1: Add UI contract tests**
+- [ ] **Step 1: Add RED UI contract test**
 
-Assert source contains stable health mapping and explicit action:
+Add:
 
 ```js
-test('P8 offline map UI exposes integrity verification and health guidance',()=>{
+test('P8 offline map UI exposes package health and explicit integrity verification',async()=>{
+  const fs=await import('node:fs');
   const ui=fs.readFileSync(new URL('../web/ui/offline-maps.jsx',import.meta.url),'utf8');
   assert.match(ui,/verifyFarmMap/);
   assert.match(ui,/healthy/);
   assert.match(ui,/unverified/);
-  assert.match(ui,/corrupt/);
   assert.match(ui,/outdated/);
+  assert.match(ui,/missing/);
+  assert.match(ui,/corrupt/);
   assert.match(ui,/Verificar integridade/);
+  assert.match(ui,/Somente no desktop Windows/);
 });
 ```
-
-Add PWA fallback assertion: when `provider.available===false`, no verify/install call can be triggered; existing field-mode fallback copy remains present.
 
 - [ ] **Step 2: Run RED**
 
@@ -598,9 +758,9 @@ node --test tests/p4-p5-field-offline.test.js tests/p8-map-robustness.test.js
 
 Expected: FAIL because no health UI/action exists.
 
-- [ ] **Step 3: Implement health/error presentation**
+- [ ] **Step 3: Implement health/error copy and verify action**
 
-In `web/ui/offline-maps.jsx`, define:
+In `web/ui/offline-maps.jsx` add:
 
 ```js
 const HEALTH_COPY=Object.freeze({
@@ -615,15 +775,26 @@ const ERROR_COPY=Object.freeze({
   MAP_CATALOG_UNAVAILABLE:'Não foi possível atualizar o catálogo. Os mapas já instalados continuam disponíveis.',
   MAP_SOURCE_UNAVAILABLE:'A fonte do mapa está indisponível. Tente novamente quando houver conexão.',
   MAP_VERIFY_FAILED:'O pacote baixado não passou na verificação e não substituiu o mapa anterior.',
-  MAP_PACKAGE_CORRUPT:'O mapa local falhou na verificação de integridade.'
+  MAP_PACKAGE_CORRUPT:'O mapa local falhou na verificação de integridade.',
+  MAP_RECOVERY_FAILED:'Há uma atualização de mapa incompleta. O mapa anterior foi preservado quando possível.'
 });
 ```
 
-Add `verify(item)` calling `onRun('verifyFarmMap',{id:item.id})`, then `reload()`.
+Add:
 
-Render health badge per installed map. Show `Verificar integridade` only when desktop provider is available. Preserve `Remover` and installation controls.
+```js
+async function verify(item){
+  setBusy(true);setMessage('');
+  try{
+    const result=await onRun('verifyFarmMap',{id:item.id});
+    setMessage(result.health==='healthy'?'Integridade verificada.':HEALTH_COPY[result.health]?.label??'Verificação concluída.');
+    await reload?.();
+  }catch(error){setMessage(ERROR_COPY[error.code]??error.message);}
+  finally{setBusy(false);}
+}
+```
 
-If the existing RPC layer exposes only `.message`, keep stable Portuguese messages generated by `MapPackageError`; do not parse OS strings. If it preserves `.code`, prefer `ERROR_COPY[error.code]`.
+Render one health badge per installed map and `Verificar integridade` only when `provider.available` is true. Preserve existing `Remover`, install, and catalog actions. Keep all desktop actions disabled/unavailable in PWA/mobile.
 
 - [ ] **Step 4: Run GREEN and build**
 
@@ -643,32 +814,31 @@ git commit -m "feat: show offline map package health"
 
 ---
 
-### Task 7: P8 E2E isolation, CI gate, status, and full regression certification
+### Task 7: P8 E2E isolation, CI, documentation, and release regression
 
 **Files:**
 - Create: `tests/e2e/p8-map-robustness.spec.mjs`
 - Modify: `tooling/qa-web.mjs`
 - Create: `.github/workflows/p8-map-robustness.yml`
 - Modify: `PRODUCT_STATUS.md`
-- Modify: `README.md` only if its phase summary still stops at P7
-- Test: `tests/p8-map-robustness.test.js`
+- Modify: `README.md` only if its capability summary still stops at P7
+- Extend: `tests/p8-map-robustness.test.js`
 
 **Interfaces:**
-- `partitionE2eFiles()` gains mandatory specialized `p8-map-robustness.spec.mjs` and returns `p8` partition.
-- `runQaWeb()` order becomes baseline P0-P5 -> P6 -> P7 -> P8, each specialized segment in a fresh Playwright process.
-- P8 workflow must run Node 22, `npm test`, `npm run build:web`, Chromium, P8 E2E, and `npm run compat:contract`.
+- `partitionE2eFiles()` requires P6, P7, and P8 specialized specs.
+- `runQaWeb()` runs baseline P0-P5 -> P6 -> P7 -> P8 in fresh Playwright processes.
+- P8 workflow runs Node 22, unit/contracts, web build, Chromium, P8 E2E, compatibility.
 
-- [ ] **Step 1: Write the P8 browser-visible fallback journey**
+- [ ] **Step 1: Create browser fallback E2E**
 
-`tests/e2e/p8-map-robustness.spec.mjs` must use the real web runtime without a desktop provider:
+Create `tests/e2e/p8-map-robustness.spec.mjs`:
 
 ```js
 import {test,expect} from '@playwright/test';
+async function enter(page){await page.goto('/');await page.getByTestId('password').fill('P8-Robustness-2026!');await page.getByTestId('auth-submit').click();await expect(page.getByText('ArtiSys Agro Lavoura').first()).toBeVisible();}
 
-test('P8 keeps field data usable when no desktop basemap provider exists',async({page})=>{
-  await page.goto('/');
-  await page.getByTestId('password').fill('P8-Robustness-2026!');
-  await page.getByTestId('auth-submit').click();
+test('P8 keeps field mode available when desktop map provider is absent',async({page})=>{
+  await enter(page);
   await page.getByTestId('nav-offline-maps').click();
   await expect(page.getByTestId('offline-maps-workspace')).toBeVisible();
   await expect(page.getByText('Somente no desktop Windows')).toBeVisible();
@@ -678,20 +848,18 @@ test('P8 keeps field data usable when no desktop basemap provider exists',async(
 });
 ```
 
-If existing test IDs differ, use the exact IDs already established by P4/P5 rather than inventing another surface.
+- [ ] **Step 2: Add RED partition test**
 
-- [ ] **Step 2: Write the qa-web partition RED test**
-
-Extend `tests/p8-map-robustness.test.js`:
+Add:
 
 ```js
-test('P8 keeps P6 P7 and P8 browser suites isolated in fresh processes',async()=>{
+test('P8 keeps P6 P7 and P8 suites in separate Playwright processes',async()=>{
   const {partitionE2eFiles}=await import('../tooling/qa-web.mjs');
-  const partitions=partitionE2eFiles([
-    'full-surface.spec.mjs','p6-gis-import.spec.mjs','p7-satellite.spec.mjs','p8-map-robustness.spec.mjs'
-  ]);
+  const partitions=partitionE2eFiles(['full-surface.spec.mjs','p6-gis-import.spec.mjs','p7-satellite.spec.mjs','p8-map-robustness.spec.mjs']);
+  assert.deepEqual(partitions.p6,['tests/e2e/p6-gis-import.spec.mjs']);
+  assert.deepEqual(partitions.p7,['tests/e2e/p7-satellite.spec.mjs']);
   assert.deepEqual(partitions.p8,['tests/e2e/p8-map-robustness.spec.mjs']);
-  assert.ok(!partitions.baseline.some(path=>path.includes('p8-map-robustness')));
+  assert.deepEqual(partitions.baseline,['tests/e2e/full-surface.spec.mjs']);
 });
 ```
 
@@ -701,9 +869,9 @@ test('P8 keeps P6 P7 and P8 browser suites isolated in fresh processes',async()=
 node --test tests/p8-map-robustness.test.js
 ```
 
-Expected: FAIL until `tooling/qa-web.mjs` requires/partitions P8.
+Expected: FAIL because P8 is not a required specialized suite.
 
-- [ ] **Step 4: Extend qa-web without weakening P6/P7 isolation**
+- [ ] **Step 4: Extend `qa-web` isolation**
 
 Change:
 
@@ -711,21 +879,19 @@ Change:
 const SPECIALIZED=Object.freeze(['p6-gis-import.spec.mjs','p7-satellite.spec.mjs','p8-map-robustness.spec.mjs']);
 ```
 
-and return:
+Return:
 
 ```js
 p8:Object.freeze(['tests/e2e/p8-map-robustness.spec.mjs'])
 ```
 
-Then in `runQaWeb()`:
+and after P7:
 
 ```js
 if(exitCode===0)exitCode=await runPlaywright(partitions.p8,'p8-map-robustness');
 ```
 
-Do not merge P8 into baseline, P6, or P7 processes.
-
-- [ ] **Step 5: Add P8 workflow**
+- [ ] **Step 5: Create P8 GitHub workflow**
 
 Create `.github/workflows/p8-map-robustness.yml`:
 
@@ -766,19 +932,17 @@ jobs:
       - run: npm run compat:contract
 ```
 
-- [ ] **Step 6: Update canonical status/documentation**
+- [ ] **Step 6: Update canonical status**
 
-Add P8 to `PRODUCT_STATUS.md` with concrete completed capabilities only:
+After local code/tests are green, add to `PRODUCT_STATUS.md`:
 
 ```md
 - P8 robustez de mapas/GIS: recuperação de instalação interrompida, integridade SHA-256, saúde de pacote, cobertura multiestado completa, topologia de polígonos, degradação segura de geometria legada, snapshot indexado para grandes conjuntos e gate E2E isolado.
 ```
 
-Do not claim commercial certification until the release gates below are actually green.
+Update `README.md` only if its visible capability summary still stops at P7. Do not claim commercial certification until remote release gates pass.
 
-- [ ] **Step 7: Run the local/full verification commands**
-
-Run in order:
+- [ ] **Step 7: Run complete local verification**
 
 ```bash
 npm test
@@ -788,7 +952,14 @@ npm run qa:web
 npm run compat:contract
 ```
 
-Expected: all PASS; `qa:web` visibly runs four segments: baseline-p0-p5, p6-gis, p7-satellite, p8-map-robustness.
+Expected: all PASS. `qa:web` logs these four segments in order:
+
+```text
+baseline-p0-p5
+p6-gis
+p7-satellite
+p8-map-robustness
+```
 
 - [ ] **Step 8: Commit**
 
@@ -797,9 +968,9 @@ git add tests/e2e/p8-map-robustness.spec.mjs tooling/qa-web.mjs .github/workflow
 git commit -m "ci: certify P8 map robustness"
 ```
 
-- [ ] **Step 9: Open/refresh implementation PR and require remote gates**
+- [ ] **Step 9: Require remote commercial gates on one exact HEAD**
 
-The implementation PR may leave draft only after the same HEAD has:
+Do not mark the implementation PR ready until the same exact HEAD has:
 
 ```text
 P8 map robustness                         success
@@ -811,11 +982,9 @@ P6 GIS import                             success
 P7 satellite                              success
 ```
 
-P3/P4/P5 remain covered by the full `npm test` + segmented `qa:web` release path; do not remove their existing workflows/contracts.
+P3/P4/P5 remain covered by `npm test`, baseline Playwright, and existing contracts/workflows.
 
-- [ ] **Step 10: Whole-branch verification before merge**
-
-Before claiming P8 complete:
+- [ ] **Step 10: Whole-branch final verification**
 
 ```bash
 npm test
@@ -823,8 +992,8 @@ npm run phase5
 npm run compat:contract
 ```
 
-Then inspect remote GitHub Actions for the exact PR HEAD and confirm Windows `release:certify` produced the installer artifact. If any gate is red, debug that gate; do not merge based only on the P8-specific workflow.
+Inspect GitHub Actions for the exact implementation HEAD. Confirm Windows `release:certify` produced the installer artifact. Any red gate blocks merge.
 
-- [ ] **Step 11: Merge only the certified implementation branch**
+- [ ] **Step 11: Merge only after certification**
 
-Use a normal merge commit/PR merge after all gates above are green. After merge, verify `main` points to the expected merge commit and at minimum the push-triggered P0/P1/P2 workflows have started on that merge tree.
+Merge the implementation PR after every required gate is green. Then verify `main` points to the expected merge commit and the push-triggered P0/P1/P2 workflows have started on the merge tree.

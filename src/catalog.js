@@ -66,6 +66,12 @@ export function createCropRepositories(persistence){
     scouting:createEntityRepository(persistence,{collection:'crop.scouting'}),
     fieldGeometries:createEntityRepository(persistence,{collection:'crop.field-geometries'}),
     inventoryCounts:createEntityRepository(persistence,{collection:'crop.inventory-counts'}),
-    inventoryTransfers:createEntityRepository(persistence,{collection:'crop.inventory-transfers'})
+    inventoryTransfers:createEntityRepository(persistence,{collection:'crop.inventory-transfers'}),
+    rainfall:createEntityRepository(persistence,{collection:'crop.rainfall'}),
+    suppliers:createEntityRepository(persistence,{collection:'crop.suppliers'}),
+    purchaseOrders:createEntityRepository(persistence,{collection:'crop.purchase-orders'}),
+    storageLots:createEntityRepository(persistence,{collection:'crop.storage-lots'}),
+    sales:createEntityRepository(persistence,{collection:'crop.sales'}),
+    deliveries:createEntityRepository(persistence,{collection:'crop.deliveries'})
   });
 }

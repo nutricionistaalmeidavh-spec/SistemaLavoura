@@ -19,15 +19,24 @@ export async function enterProduct(page,{username='admin',password}){
   await expect(page.getByRole('button',{name:'Sair'})).toBeVisible();
 }
 
+export async function fillLines(dialog,label,value){
+  await dialog.locator('label').filter({hasText:label}).locator('textarea').fill(value);
+}
+
+export async function submitDialog(dialog,buttonName){
+  await dialog.getByRole('button',{name:buttonName,exact:true}).click();
+  await expect(dialog).toBeHidden();
+}
+
 export async function createField(page,{code='E2E-01',name='Talhão E2E',farm='Fazenda E2E',area='10'}={}){
   await page.getByTestId('nav-fields').click();
   await page.getByRole('button',{name:'Novo talhão'}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByLabel('Código',{exact:true}).fill(code);
-  await dialog.getByLabel('Nome',{exact:true}).fill(name);
-  await dialog.getByLabel('Fazenda',{exact:true}).fill(farm);
-  await dialog.getByLabel('Área (ha)',{exact:true}).fill(area);
-  await dialog.getByRole('button',{name:'Criar talhão',exact:true}).click();
+  await dialog.locator('#field-code').fill(code);
+  await dialog.locator('#field-name').fill(name);
+  await dialog.locator('#field-farmUnitName').fill(farm);
+  await dialog.locator('#field-areaHa').fill(area);
+  await submitDialog(dialog,'Criar talhão');
   await expect(page.getByText(name,{exact:true}).first()).toBeVisible();
 }
 
@@ -35,9 +44,9 @@ export async function createSeason(page,{crop='Soja E2E',period='2026/27'}={}){
   await page.getByTestId('nav-seasons').click();
   await page.getByRole('button',{name:'Nova safra',exact:true}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByLabel('Cultura',{exact:true}).fill(crop);
-  await dialog.getByLabel('Safra/Período',{exact:true}).fill(period);
-  await dialog.getByRole('button',{name:'Salvar',exact:true}).click();
+  await dialog.locator('#field-crop').fill(crop);
+  await dialog.locator('#field-periodName').fill(period);
+  await submitDialog(dialog,'Salvar');
   await expect(page.getByText(crop,{exact:true}).first()).toBeVisible();
 }
 
@@ -45,11 +54,11 @@ export async function createInput(page,{name='Insumo E2E',unit='L',category='Def
   await page.getByTestId('nav-inputs').click();
   await page.getByRole('button',{name:/Novo insumo/}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByLabel('Nome',{exact:true}).fill(name);
+  await dialog.locator('#field-name').fill(name);
   await dialog.locator('#field-unit').selectOption(unit);
-  await dialog.getByLabel('Categoria',{exact:true}).fill(category);
-  await dialog.getByLabel('Custo unitário (R$)',{exact:true}).fill(unitCost);
-  await dialog.getByRole('button',{name:'Salvar',exact:true}).click();
+  await dialog.locator('#field-category').fill(category);
+  await dialog.locator('#field-unitCost').fill(unitCost);
+  await submitDialog(dialog,'Salvar');
   await expect(page.getByText(name,{exact:true}).first()).toBeVisible();
 }
 

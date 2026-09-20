@@ -9,7 +9,9 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
     ]),
     remove:action('remove','Excluir talhão',[],{confirm:true,destructive:true}),
     uploadFile:action('uploadFile','Anexar arquivo',[field('file','Arquivo','file')]),
-    removeFile:action('removeFile','Excluir arquivo',[],{confirm:true,destructive:true})
+    removeFile:action('removeFile','Excluir arquivo',[],{confirm:true,destructive:true}),
+    saveGeometry:action('saveGeometry','Salvar mapa do talhão',[field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('coordinatesText','Coordenadas do polígono','textarea',{help:'Uma coordenada longitude,latitude por linha.'})]),
+    addScouting:action('addScouting','Registrar monitoramento',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('kind','Tipo','select',{options:['praga','doença','erva-daninha','outro']}),field('name','Ocorrência'),field('severity','Severidade (0-5)','number',{min:0,max:5}),field('affectedAreaHa','Área afetada (ha)','number'),field('notes','Observações','textarea')])
   })}),
   seasons:Object.freeze({screenId:'seasons',title:'Safras',actions:Object.freeze({
     save:action('save','Salvar safra',[
@@ -32,17 +34,21 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
     savePlan:action('savePlan','Salvar planejamento',[field('name','Nome'),field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('startsAt','Início','datetime-local'),field('endsAt','Fim','datetime-local'),field('resourceIds','Recursos','tags')]),
     createChecklist:action('createChecklist','Criar checklist',[field('title','Título'),field('items','Itens obrigatórios','lines')]),
     setChecklistItem:action('setChecklistItem','Atualizar item',[field('itemId','Item'),field('checked','Concluído','checkbox')]),
-    completeChecklist:action('completeChecklist','Concluir checklist',[],{confirm:true})
+    completeChecklist:action('completeChecklist','Concluir checklist',[],{confirm:true}),
+    recordApplication:action('recordApplication','Registrar aplicação',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('areaHa','Área aplicada (ha)','number',{min:0.01}),field('target','Alvo'),field('temperatureC','Temperatura (°C)','number'),field('humidityPct','Umidade (%)','number'),field('windKmh','Vento (km/h)','number'),field('notes','Observações','textarea')]),
+    addScouting:action('addScouting','Registrar monitoramento',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('kind','Tipo','select',{options:['praga','doença','erva-daninha','outro']}),field('name','Ocorrência'),field('severity','Severidade (0-5)','number',{min:0,max:5}),field('notes','Observações','textarea')])
   })}),
   inputs:Object.freeze({screenId:'inputs',title:'Insumos',actions:Object.freeze({
     save:action('save','Salvar insumo',[field('name','Nome'),field('unit','Unidade','select',{options:units}),field('category','Categoria'),field('unitCost','Custo unitário (R$)','money',{min:0,step:'0.01'}),field('brand','Marca'),field('activeIngredient','Ingrediente ativo')])
   })}),
   harvest:Object.freeze({screenId:'harvest',title:'Colheita',actions:Object.freeze({
-    create:action('create','Registrar colheita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('areaHa','Área colhida (ha)','number',{min:0.0001,step:'any'}),field('harvestedAt','Data da colheita','datetime-local')])
+    create:action('create','Registrar colheita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('areaHa','Área colhida (ha)','number',{min:0.0001,step:'any'}),field('harvestedAt','Data da colheita','datetime-local'),field('moisturePct','Umidade (%)','number',{min:0}),field('impurityPct','Impurezas (%)','number',{min:0}),field('lossPct','Perdas (%)','number',{min:0}),field('destination','Destino/Silo'),field('loadRef','Carga/romaneio')])
   })}),
   inventory:Object.freeze({screenId:'inventory',title:'Estoque',actions:Object.freeze({
     receive:action('receive','Registrar entrada',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('expiresAt','Validade','date'),field('reference','Referência'),field('occurredAt','Data','datetime-local')]),
-    consume:action('consume','Registrar saída',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('reference','Referência'),field('occurredAt','Data','datetime-local')])
+    consume:action('consume','Registrar saída',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('reference','Referência'),field('occurredAt','Data','datetime-local')]),
+    physicalCount:action('physicalCount','Contagem física',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('countedQuantity','Quantidade contada','number',{min:0}),field('warehouse','Armazém')]),
+    transfer:action('transfer','Transferir estoque',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001}),field('fromWarehouse','Origem'),field('toWarehouse','Destino')])
   })}),
   finance:Object.freeze({screenId:'finance',title:'Financeiro',actions:Object.freeze({
     addExpense:action('addExpense','Nova despesa',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('category','Categoria')]),

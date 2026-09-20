@@ -379,7 +379,7 @@ Add separate temp-dir tests for:
 - invalid metadata JSON plus intact `.pmtiles` -> PMTiles remains and `recoveryIssues` contains one integrity/recovery issue;
 - cached catalog `2026.09.2` plus metadata `catalogVersion:'2026.09.1'` -> `outdated` while the package remains listed.
 
-Each test must create the exact metadata/file paths under `<dataDir>/maps/packages` and assert the files remain after snapshot/verification.
+Each test creates the exact metadata/file paths under `<dataDir>/maps/packages` and asserts the files remain after snapshot/verification.
 
 - [ ] **Step 2: Run RED**
 
@@ -763,21 +763,8 @@ Expected: FAIL because no health UI/action exists.
 In `web/ui/offline-maps.jsx` add:
 
 ```js
-const HEALTH_COPY=Object.freeze({
-  healthy:{label:'Verificado',tone:'ok'},
-  unverified:{label:'Não verificado',tone:'warning'},
-  outdated:{label:'Atualização disponível',tone:'warning'},
-  missing:{label:'Arquivo ausente',tone:'danger'},
-  corrupt:{label:'Falha de integridade',tone:'danger'}
-});
-const ERROR_COPY=Object.freeze({
-  MAP_DISK_FULL:'Libere espaço em disco e tente novamente.',
-  MAP_CATALOG_UNAVAILABLE:'Não foi possível atualizar o catálogo. Os mapas já instalados continuam disponíveis.',
-  MAP_SOURCE_UNAVAILABLE:'A fonte do mapa está indisponível. Tente novamente quando houver conexão.',
-  MAP_VERIFY_FAILED:'O pacote baixado não passou na verificação e não substituiu o mapa anterior.',
-  MAP_PACKAGE_CORRUPT:'O mapa local falhou na verificação de integridade.',
-  MAP_RECOVERY_FAILED:'Há uma atualização de mapa incompleta. O mapa anterior foi preservado quando possível.'
-});
+const HEALTH_COPY=Object.freeze({healthy:{label:'Verificado',tone:'ok'},unverified:{label:'Não verificado',tone:'warning'},outdated:{label:'Atualização disponível',tone:'warning'},missing:{label:'Arquivo ausente',tone:'danger'},corrupt:{label:'Falha de integridade',tone:'danger'}});
+const ERROR_COPY=Object.freeze({MAP_DISK_FULL:'Libere espaço em disco e tente novamente.',MAP_CATALOG_UNAVAILABLE:'Não foi possível atualizar o catálogo. Os mapas já instalados continuam disponíveis.',MAP_SOURCE_UNAVAILABLE:'A fonte do mapa está indisponível. Tente novamente quando houver conexão.',MAP_VERIFY_FAILED:'O pacote baixado não passou na verificação e não substituiu o mapa anterior.',MAP_PACKAGE_CORRUPT:'O mapa local falhou na verificação de integridade.',MAP_RECOVERY_FAILED:'Há uma atualização de mapa incompleta. O mapa anterior foi preservado quando possível.'});
 ```
 
 Add:
@@ -785,16 +772,13 @@ Add:
 ```js
 async function verify(item){
   setBusy(true);setMessage('');
-  try{
-    const result=await onRun('verifyFarmMap',{id:item.id});
-    setMessage(result.health==='healthy'?'Integridade verificada.':HEALTH_COPY[result.health]?.label??'Verificação concluída.');
-    await reload?.();
-  }catch(error){setMessage(ERROR_COPY[error.code]??error.message);}
+  try{const result=await onRun('verifyFarmMap',{id:item.id});setMessage(result.health==='healthy'?'Integridade verificada.':HEALTH_COPY[result.health]?.label??'Verificação concluída.');await reload?.();}
+  catch(error){setMessage(ERROR_COPY[error.code]??error.message);}
   finally{setBusy(false);}
 }
 ```
 
-Render one health badge per installed map and `Verificar integridade` only when `provider.available` is true. Preserve existing `Remover`, install, and catalog actions. Keep all desktop actions disabled/unavailable in PWA/mobile.
+Render one health badge per installed map and `Verificar integridade` only when `provider.available` is true. Preserve existing `Remover`, install, and catalog actions. Keep desktop actions unavailable in PWA/mobile.
 
 - [ ] **Step 4: Run GREEN and build**
 
@@ -952,14 +936,7 @@ npm run qa:web
 npm run compat:contract
 ```
 
-Expected: all PASS. `qa:web` logs these four segments in order:
-
-```text
-baseline-p0-p5
-p6-gis
-p7-satellite
-p8-map-robustness
-```
+Expected: all PASS. `qa:web` logs `baseline-p0-p5`, `p6-gis`, `p7-satellite`, then `p8-map-robustness`.
 
 - [ ] **Step 8: Commit**
 

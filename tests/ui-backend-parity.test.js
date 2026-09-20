@@ -73,3 +73,10 @@ test('operations UI renders the complete operational analytics without truncatin
   assert.doesNotMatch(source,/scouting\.slice\(/,'scouting history must not be truncated');
   assert.doesNotMatch(source,/rainfall\.slice\(/,'rainfall history must not be truncated');
 });
+
+test('operation scheduling lets the user plan inputs so future requirements can be calculated',()=>{
+  const source=read('web/ui/operations.jsx');
+  assert.match(source,/plannedInputs/,'schedule form must expose planned input lines');
+  assert.match(source,/inputItems/,'planned input lines must be converted to backend inputItems');
+  assert.match(source,/Previsão de insumos/,'future input requirements must be visible to the user');
+});

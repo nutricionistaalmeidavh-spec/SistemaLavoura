@@ -20,6 +20,21 @@ test('E2E surface contract covers every agricultural UI contract action plus vir
   assert.deepEqual(new Set(contract.journeys),new Set(['agricultural-chain','administration-rbac','inventory-lifecycle','purchase-lifecycle']));
 });
 
+test('every E2E action has an owning browser journey or an explicit desktop-only exception',()=>{
+  assert.equal(exists('qa/e2e-action-coverage.json'),true,'missing qa/e2e-action-coverage.json');
+  const surface=JSON.parse(read('qa/e2e-surface-contract.json'));
+  const coverage=JSON.parse(read('qa/e2e-action-coverage.json'));
+  for(const [screenId,actions] of Object.entries(surface.actions)){
+    for(const action of actions){
+      const key=`${screenId}.${action}`;
+      assert.equal(typeof coverage[key],'string',`${key} has no E2E coverage owner`);
+      const owner=coverage[key];
+      if(owner.startsWith('desktop-only:'))continue;
+      assert.equal(exists(`tests/e2e/${owner}`),true,`${key} points to missing ${owner}`);
+    }
+  }
+});
+
 test('P4 and P5 published screens have real runtime renderers',()=>{
   const runtime=read('web/ui/runtime.jsx');
   assert.match(runtime,/LavouraFieldMode/);

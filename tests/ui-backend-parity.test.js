@@ -44,6 +44,7 @@ test('dashboard UI exposes search, alert lifecycle actions and capture',()=>{
     assert.match(source,new RegExp(`onRun\\(['\"]${action}['\"]`),`dashboard action ${action} is not exposed`);
   }
   assert.match(source,/fileToBase64/,'capture must support a user-selected file');
+  assert.match(source,/fileId/,'capture must send the file identity required by the capture service');
 });
 
 test('reports UI renders advanced commercial comparisons and indicators already produced by backend',()=>{

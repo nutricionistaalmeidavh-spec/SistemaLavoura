@@ -5,6 +5,7 @@ test('percorre 100% das telas publicadas pelo produto',async({page},testInfo)=>{
   await page.goto('/');
   await page.getByTestId('password').fill(['Qa','Browser','2026!'].join('-'));
   await page.getByTestId('auth-submit').click();
+  await expect(page.getByRole('button',{name:'Sair'}),'shell autenticado').toBeVisible();
   for(let i=0;i<contract.screens.length;i+=1){
     const id=contract.screens[i];
     const nav=page.getByTestId(`nav-${id}`);

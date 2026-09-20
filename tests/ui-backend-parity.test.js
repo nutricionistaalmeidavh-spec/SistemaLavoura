@@ -27,11 +27,17 @@ test('dashboard load exposes the commercial management read model consumed by th
   assert.ok(Array.isArray(data.commercial.alerts),'overview must expose intelligent alerts');
 }));
 
-test('operations load exposes commercial climate and alerts alongside advanced operational read models',async()=>withHost(async host=>{
+test('operations load exposes the complete commercial operational read model',async()=>withHost(async host=>{
   const data=await host.presentation.load('operations',{});
   assert.ok(data.commercial,'operations must expose commercial read model');
   assert.equal(typeof data.commercial.climate?.totalRainMm,'number');
   assert.ok(Array.isArray(data.commercial.alerts));
+  assert.ok(Array.isArray(data.commercial.requirements));
+  assert.ok(Array.isArray(data.commercial.rainfall));
+  assert.equal(typeof data.commercial.fieldMobile?.offlineReady,'boolean');
+  assert.ok(Array.isArray(data.commercial.fieldMobile?.pendingOperations));
+  assert.ok(Array.isArray(data.commercial.fieldMobile?.openScouting));
+  assert.ok(Array.isArray(data.commercial.fieldMobile?.recentRainfall));
   assert.ok('planningProgress' in data);
   assert.ok(Array.isArray(data.gantt));
   assert.ok(Array.isArray(data.applications));
@@ -47,16 +53,30 @@ test('dashboard UI exposes search, alert lifecycle actions and capture',()=>{
   assert.match(source,/fileId/,'capture must send the file identity required by the capture service');
 });
 
-test('reports UI renders advanced commercial comparisons and indicators already produced by backend',()=>{
+test('reports UI renders comparisons, advanced indicators and the consolidated management report',()=>{
   const source=read('web/ui/reports.jsx');
   for(const key of ['seasonComparison','fieldComparison','indicators','report','alerts']){
     assert.match(source,new RegExp(key),`reports does not surface commercial.${key}`);
   }
+  assert.match(source,/report\.indicators/,'management report indicators must be rendered');
+  assert.match(source,/report\.seasonComparison/,'management report season comparison must be rendered');
+  assert.match(source,/report\.fieldComparison/,'management report field comparison must be rendered');
 });
 
-test('operations UI renders planning progress, gantt, applications and scouting',()=>{
+test('operations UI renders the complete operational analytics without truncating histories',()=>{
   const source=read('web/ui/operations.jsx');
-  for(const key of ['planningProgress','gantt','applications','scouting']){
+  for(const key of ['planningProgress','gantt','applications','scouting','requirements','fieldMobile','rainfall']){
     assert.match(source,new RegExp(key),`operations does not surface ${key}`);
   }
+  assert.doesNotMatch(source,/gantt\.slice\(/,'gantt history must not be truncated');
+  assert.doesNotMatch(source,/applications\.slice\(/,'application history must not be truncated');
+  assert.doesNotMatch(source,/scouting\.slice\(/,'scouting history must not be truncated');
+  assert.doesNotMatch(source,/rainfall\.slice\(/,'rainfall history must not be truncated');
+});
+
+test('operation scheduling lets the user plan inputs so future requirements can be calculated',()=>{
+  const source=read('web/ui/operations.jsx');
+  assert.match(source,/plannedInputs/,'schedule form must expose planned input lines');
+  assert.match(source,/inputItems/,'planned input lines must be converted to backend inputItems');
+  assert.match(source,/Previsão de insumos/,'future input requirements must be visible to the user');
 });

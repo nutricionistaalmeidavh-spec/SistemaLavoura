@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {captureStep,createField,createInput,createSeason,enterProduct,submitDialog} from './evidence-helpers.mjs';
+import {captureStep,createField,createInput,createSeason,enterProduct,selectOperationRow,submitDialog} from './evidence-helpers.mjs';
 
 const password=['Action','Matrix','2026!'].join('-');
 
@@ -34,8 +34,7 @@ test('screen action matrix keeps every published user action reachable from the 
   await dialog.getByLabel('Tipo de operação',{exact:true}).fill('Operação Matriz');
   await dialog.getByLabel('Programada para',{exact:true}).fill('2026-09-22T08:00');
   await submitDialog(dialog,'Programar operação');
-  await expect(page.getByText('Operação Matriz',{exact:true}).first()).toBeVisible();
-  await page.getByText('Operação Matriz',{exact:true}).first().click();
+  await selectOperationRow(page,'Operação Matriz');
   await expectButtons(page,['Iniciar','Cancelar','Novo checklist']);
   await captureStep(page,testInfo,'matrix-operations-actions');
 

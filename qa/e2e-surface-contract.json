@@ -1,0 +1,18 @@
+{
+  "screens": ["overview","fields","seasons","operations","inputs","harvest","inventory","finance","reports","settings","admin","iot"],
+  "actions": {
+    "overview": ["search","acknowledgeAlert","snoozeAlert","dismissAlert","capture"],
+    "fields": ["save","remove","uploadFile","removeFile","saveGeometry","addScouting"],
+    "seasons": ["save"],
+    "operations": ["schedule","start","complete","cancel","savePlan","createChecklist","setChecklistItem","completeChecklist","recordRainfall","recordApplication","addScouting"],
+    "inputs": ["save"],
+    "harvest": ["addStorage","create"],
+    "inventory": ["receive","consume","physicalCount","transfer"],
+    "finance": ["addExpense","saveSupplier","createPurchaseOrder","receivePurchaseOrder","createSale","deliverSale","addIncome"],
+    "reports": ["csv","issue","summary","export","pdf"],
+    "settings": ["backup","restore","recoveryCode","restoreByCode","set","merge","previewImport","applyImport","upsertCatalog","setFeatureFlag"],
+    "admin": ["createUser","setUserRoles","setUserActive","changePassword"],
+    "iot": ["saveDevice","bindField","saveAdapterConfig","setAdapterEnabled","saveRule","removeRule"]
+  },
+  "journeys": ["agricultural-chain","administration-rbac","inventory-lifecycle","purchase-lifecycle"]
+}

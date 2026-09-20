@@ -36,9 +36,9 @@ test('P3 cria polígono do talhão, abre ficha espacial e persiste ponto agríco
   await page.getByRole('button',{name:'Novo ponto no mapa',exact:true}).click();
   dialog=page.getByRole('dialog');
   await dialog.locator('#field-kind').selectOption('sensor');
-  await dialog.getByLabel('Nome',{exact:true}).fill('Pluviômetro P3');
-  await dialog.getByLabel('Latitude',{exact:true}).fill('-21.21');
-  await dialog.getByLabel('Longitude',{exact:true}).fill('-47.90');
+  await dialog.locator('#field-name').fill('Pluviômetro P3');
+  await dialog.locator('#field-latitude').fill('-21.21');
+  await dialog.locator('#field-longitude').fill('-47.90');
   await dialog.getByRole('button',{name:'Salvar ponto',exact:true}).click();
 
   await expect(page.getByText('Pontos georreferenciados').locator('..').getByText('1',{exact:true})).toBeVisible();

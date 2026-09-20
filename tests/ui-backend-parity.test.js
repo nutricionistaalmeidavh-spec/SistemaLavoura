@@ -44,18 +44,18 @@ test('dashboard UI exposes search, alert lifecycle actions and capture',()=>{
     assert.match(source,new RegExp(`onRun\\(['\"]${action}['\"]`),`dashboard action ${action} is not exposed`);
   }
   assert.match(source,/fileToBase64/,'capture must support a user-selected file');
-}));
+});
 
 test('reports UI renders advanced commercial comparisons and indicators already produced by backend',()=>{
   const source=read('web/ui/reports.jsx');
   for(const key of ['seasonComparison','fieldComparison','indicators','report','alerts']){
     assert.match(source,new RegExp(key),`reports does not surface commercial.${key}`);
   }
-}));
+});
 
 test('operations UI renders planning progress, gantt, applications and scouting',()=>{
   const source=read('web/ui/operations.jsx');
   for(const key of ['planningProgress','gantt','applications','scouting']){
     assert.match(source,new RegExp(key),`operations does not surface ${key}`);
   }
-}));
+});

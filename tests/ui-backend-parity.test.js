@@ -80,3 +80,9 @@ test('operation scheduling lets the user plan inputs so future requirements can 
   assert.match(source,/inputItems/,'planned input lines must be converted to backend inputItems');
   assert.match(source,/Previsão de insumos/,'future input requirements must be visible to the user');
 });
+
+test('selected operation is refreshed from reloaded rows after a workflow mutation',()=>{
+  const source=read('web/ui/operations.jsx');
+  assert.match(source,/useEffect/,'operations must react to reloaded rows');
+  assert.match(source,/setSelected\(fresh\)/,'selected operation must be replaced by the refreshed row');
+});

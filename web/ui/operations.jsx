@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import {getUiContract,hydrateUiFields,referenceLabel} from './contracts.js';
 import {ConfirmDialog,DataTable,KpiStrip,Modal,PageHeader,StatusBadge,StructuredForm,money,recordRows,unwrapRecord} from './primitives.jsx';
 
@@ -77,6 +77,13 @@ export function LavouraOperationsWorkspace({data,onRun}){
   const [dialog,setDialog]=useState(null);
   const [confirm,setConfirm]=useState(null);
   const [busy,setBusy]=useState(false);
+  useEffect(()=>{
+    const selectedId=selected?.row?.id;
+    if(!selectedId)return;
+    const fresh=rows.find(item=>String(item.row.id)===String(selectedId));
+    if(!fresh){setSelected(null);return;}
+    if(fresh!==selected)setSelected(fresh);
+  },[rows,selected?.row?.id]);
   const selectedRow=selected?.row??null;
   const selectedChecklists=selectedRow?checklists.filter(item=>item.row.entityId===selectedRow.id):[];
   const selectedNotebook=selectedRow?notebook.filter(item=>item.row.operationId===selectedRow.id):[];

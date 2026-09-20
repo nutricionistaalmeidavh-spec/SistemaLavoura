@@ -1,0 +1,113 @@
+import {test,expect} from '@playwright/test';
+import {captureStep,createField,createInput,createSeason,enterProduct,fillLines,selectOperationRow,selectOptionContaining,submitDialog} from './evidence-helpers.mjs';
+
+const password=['Agricultural','Journey','2026!'].join('-');
+const select=(dialog,id,label)=>dialog.locator(`#field-${id}`).selectOption({label});
+
+test('agricultural-chain uses the UI from field registration through report issuance',async({page},testInfo)=>{
+  await enterProduct(page,{password});
+  await captureStep(page,testInfo,'login-dashboard');
+  await createField(page,{code:'CHAIN-01',name:'Talhão Cadeia E2E',farm:'Fazenda Cadeia E2E',area:'10'});
+  await captureStep(page,testInfo,'talhao-criado');
+  await createSeason(page,{crop:'Soja Cadeia E2E',period:'2026/27'});
+  await captureStep(page,testInfo,'safra-criada');
+  await createInput(page,{name:'Insumo Cadeia E2E',unit:'kg',category:'Fertilizante',unitCost:'25.90'});
+  await captureStep(page,testInfo,'insumo-criado');
+
+  await page.getByTestId('nav-inventory').click();
+  await page.getByRole('button',{name:'Registrar entrada',exact:true}).click();
+  let d=page.getByRole('dialog');
+  await select(d,'sku','Insumo Cadeia E2E (kg)');
+  await d.getByLabel('Quantidade',{exact:true}).fill('100');
+  await d.getByLabel('Lote',{exact:true}).fill('CHAIN-LOT-01');
+  await submitDialog(d,'Registrar entrada');
+  await captureStep(page,testInfo,'estoque-inicial');
+
+  await page.getByTestId('nav-operations').click();
+  await page.getByRole('button',{name:'Programar operação',exact:true}).click();
+  d=page.getByRole('dialog');
+  await select(d,'seasonId','Soja Cadeia E2E 2026/27');
+  await select(d,'fieldId','Fazenda Cadeia E2E > Talhão Cadeia E2E — 10 ha');
+  await d.getByLabel('Tipo de operação',{exact:true}).fill('Operação Cadeia E2E');
+  await d.getByLabel('Programada para',{exact:true}).fill('2026-09-21T08:00');
+  await fillLines(d,'Insumos planejados','Insumo Cadeia E2E | 20');
+  await submitDialog(d,'Programar operação');
+  await selectOperationRow(page,'Operação Cadeia E2E');
+  await captureStep(page,testInfo,'operacao-programada');
+
+  await page.getByRole('button',{name:'Iniciar',exact:true}).click();
+  d=page.getByRole('dialog');
+  await d.getByLabel('Iniciada em',{exact:true}).fill('2026-09-21T08:05');
+  await submitDialog(d,'Iniciar operação');
+  await expect(page.getByRole('button',{name:'Concluir',exact:true})).toBeVisible();
+  await captureStep(page,testInfo,'operacao-iniciada');
+
+  await page.getByRole('button',{name:'Registrar aplicação',exact:true}).click();
+  d=page.getByRole('dialog');
+  await select(d,'seasonId','Soja Cadeia E2E 2026/27');
+  await select(d,'fieldId','Fazenda Cadeia E2E > Talhão Cadeia E2E — 10 ha');
+  await d.getByLabel('Área aplicada (ha)',{exact:true}).fill('10');
+  await fillLines(d,'Produtos e doses','Insumo Cadeia E2E | 2 kg/ha');
+  await d.getByLabel('Alvo',{exact:true}).fill('Adubação E2E');
+  await submitDialog(d,'Registrar aplicação');
+  await captureStep(page,testInfo,'aplicacao-registrada');
+
+  await page.getByRole('button',{name:'Concluir',exact:true}).click();
+  d=page.getByRole('dialog');
+  await d.getByLabel('Concluída em',{exact:true}).fill('2026-09-21T10:00');
+  await d.getByLabel('Área executada (ha)',{exact:true}).fill('10');
+  await d.getByLabel('Mão de obra (R$)',{exact:true}).fill('100');
+  await d.getByLabel('Máquina (R$)',{exact:true}).fill('200');
+  await submitDialog(d,'Concluir operação');
+  await captureStep(page,testInfo,'operacao-concluida');
+
+  await page.getByTestId('nav-harvest').click();
+  await page.getByRole('button',{name:'Registrar colheita',exact:true}).click();
+  d=page.getByRole('dialog');
+  await select(d,'seasonId','Soja Cadeia E2E 2026/27');
+  await select(d,'fieldId','Fazenda Cadeia E2E > Talhão Cadeia E2E — 10 ha');
+  await d.getByLabel('Quantidade',{exact:true}).fill('1000');
+  await d.locator('#field-unit').selectOption('kg');
+  await d.getByLabel('Área colhida (ha)',{exact:true}).fill('10');
+  await submitDialog(d,'Registrar colheita');
+  await captureStep(page,testInfo,'colheita-registrada');
+
+  await page.getByRole('button',{name:'Lote armazenado',exact:true}).click();
+  d=page.getByRole('dialog');
+  await select(d,'seasonId','Soja Cadeia E2E 2026/27');
+  await select(d,'fieldId','Fazenda Cadeia E2E > Talhão Cadeia E2E — 10 ha');
+  await d.getByLabel('Silo/Armazém',{exact:true}).fill('Silo Cadeia');
+  await d.getByLabel('Quantidade',{exact:true}).fill('1000');
+  await d.locator('#field-unit').selectOption('kg');
+  await submitDialog(d,'Registrar lote armazenado');
+  await captureStep(page,testInfo,'lote-armazenado');
+
+  await page.getByTestId('nav-finance').click();
+  await page.getByRole('button',{name:'Nova venda',exact:true}).click();
+  d=page.getByRole('dialog');
+  await select(d,'seasonId','Soja Cadeia E2E 2026/27');
+  await d.getByLabel('Comprador',{exact:true}).fill('Comprador Cadeia E2E');
+  await d.getByLabel('Quantidade',{exact:true}).fill('100');
+  await d.locator('#field-unit').selectOption('kg');
+  await d.getByLabel('Preço unitário (R$)',{exact:true}).fill('5');
+  await select(d,'fieldId','Fazenda Cadeia E2E > Talhão Cadeia E2E — 10 ha');
+  await submitDialog(d,'Nova venda');
+  await captureStep(page,testInfo,'venda-criada');
+
+  await page.getByRole('button',{name:'Registrar entrega',exact:true}).click();
+  d=page.getByRole('dialog');
+  await selectOptionContaining(d.locator('#field-saleId'),'Comprador Cadeia E2E');
+  await d.getByLabel('Quantidade entregue',{exact:true}).fill('100');
+  await d.getByLabel('Romaneio/Referência',{exact:true}).fill('ROM-CHAIN-01');
+  await submitDialog(d,'Registrar entrega');
+  await captureStep(page,testInfo,'financeiro-da-venda');
+
+  await page.getByTestId('nav-reports').click();
+  const download=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Gerar CSV',exact:true}).click();
+  await download;
+  await expect(page.getByText('Resultado pronto')).toBeVisible();
+  await page.getByRole('button',{name:'Emitir documento',exact:true}).click();
+  await expect(page.getByText('Documentos emitidos')).toBeVisible();
+  await captureStep(page,testInfo,'relatorio-emitido');
+});

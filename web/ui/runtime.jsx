@@ -11,6 +11,8 @@ import {LavouraFinanceWorkspace} from './finance.jsx';
 import {LavouraHarvestWorkspace} from './harvest.jsx';
 import {LavouraReportsWorkspace} from './reports.jsx';
 import {LavouraSettingsWorkspace} from './settings.jsx';
+import {LavouraFieldMode} from './field-mode.jsx';
+import {LavouraOfflineMaps} from './offline-maps.jsx';
 import {LavouraAdminWorkspace} from './admin.jsx';
 import {IoTWorkspace} from '../iot/IoTWorkspace.jsx';
 
@@ -42,6 +44,8 @@ const specializedScreens={
   finance:LavouraFinanceWorkspace,
   reports:LavouraReportsWorkspace,
   settings:LavouraSettingsWorkspace,
+  'field-mode':LavouraFieldMode,
+  'offline-maps':LavouraOfflineMaps,
   admin:LavouraAdminWorkspace,
   iot:IoTWorkspace
 };

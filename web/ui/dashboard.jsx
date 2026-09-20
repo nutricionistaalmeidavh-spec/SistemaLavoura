@@ -16,13 +16,13 @@ function EmptyAttention(){return <div className="dashboard-empty"><div className
 
 export function LavouraDashboard({data,onNavigate}){
   const model=buildDashboardViewModel(data);
-  const progress=model.progress;
+  const progress=model.progress;const management=data?.commercial?.management??{};
   return <div className="dashboard-page">
     <section className="dashboard-intro"><div><span className="eyebrow">Visão geral</span><h2>Panorama da lavoura</h2><p>Indicadores consolidados a partir dos dados registrados neste dispositivo.</p></div><div className="dashboard-intro-meta"><span className="status-dot"/> Base local atualizada</div></section>
 
     <section className="kpi-grid" aria-label="Indicadores principais">{model.kpis.map(item=><KpiCard key={item.id} item={item}/>)}</section>
 
-    <section className="dashboard-main-grid">
+    <section className="workspace-kpis"><article className="workspace-kpi"><span>Área gerenciada</span><strong>{number.format(management.totalAreaHa??0)} ha</strong></article><article className="workspace-kpi"><span>Receita agrícola</span><strong>{money.format((management.totalIncomeMinor??0)/100)}</strong></article><article className="workspace-kpi"><span>Custo agrícola</span><strong>{money.format((management.totalExpenseMinor??0)/100)}</strong></article><article className="workspace-kpi"><span>Monitoramentos abertos</span><strong>{management.openScouting??0}</strong></article></section><section className="dashboard-main-grid">
       <article className="dashboard-card operations-card">
         <header className="card-heading"><div><span className="eyebrow">Execução</span><h3>Andamento das operações</h3></div><button className="text-button" type="button" onClick={()=>onNavigate?.('operations')}>Ver operações</button></header>
         <div className="progress-hero"><strong>{progress.percent}%</strong><span>das operações registradas foram concluídas</span></div>

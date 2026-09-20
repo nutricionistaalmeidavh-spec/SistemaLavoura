@@ -22,6 +22,7 @@ test('E2E surface contract covers every agricultural UI contract action plus vir
 
 test('browser journeys and successful-run visual evidence are part of the release suite',()=>{
   for(const file of [
+    'tests/e2e/action-matrix.spec.mjs',
     'tests/e2e/agricultural-journey.spec.mjs',
     'tests/e2e/admin-journey.spec.mjs',
     'tests/e2e/inventory-journey.spec.mjs',
@@ -37,6 +38,7 @@ test('browser journeys and successful-run visual evidence are part of the releas
 
 test('journey specs capture named screenshots after user actions',()=>{
   for(const file of [
+    'tests/e2e/action-matrix.spec.mjs',
     'tests/e2e/agricultural-journey.spec.mjs',
     'tests/e2e/admin-journey.spec.mjs',
     'tests/e2e/inventory-journey.spec.mjs',

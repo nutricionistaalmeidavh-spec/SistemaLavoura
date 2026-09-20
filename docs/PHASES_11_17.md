@@ -18,6 +18,7 @@ Implementação do primeiro bloco do roadmap comercial sem dependências pagas o
 - Talhões, safras e insumos usam seletores com rótulos agrícolas legíveis.
 - Unidades agrícolas comuns são oferecidas diretamente.
 - Planejamentos e checklists recebem IDs internos automaticamente.
+- A validação do domínio ocorre antes da criação automática de entidades auxiliares, preservando erros e contratos legados.
 
 ## Fases 13–16 — transação operação → estoque → custos
 
@@ -26,12 +27,13 @@ Implementação do primeiro bloco do roadmap comercial sem dependências pagas o
 1. validar área executada e insumos;
 2. calcular quantidade por dose/ha;
 3. validar saldo antes da baixa;
-4. concluir a operação;
-5. baixar os lotes/itens no estoque;
-6. calcular custo de insumos, mão de obra, máquina e outros;
-7. lançar a despesa da operação no financeiro;
-8. calcular custo por hectare;
-9. atualizar os read models de custos por talhão, safra e categoria.
+4. alocar automaticamente os lotes disponíveis, priorizando validade mais próxima (FEFO), ou respeitar um lote escolhido;
+5. concluir a operação;
+6. baixar os lotes/itens no estoque sem perder a rastreabilidade do lote;
+7. calcular custo de insumos, mão de obra, máquina e outros;
+8. lançar a despesa da operação no financeiro;
+9. calcular custo por hectare;
+10. atualizar os read models de custos por operação, talhão, safra, cultura e categoria de custo.
 
 O dispatcher já existente fornece atomicidade no SQLite e rollback por snapshot na PWA. O fluxo não inicia uma segunda transação interna.
 
@@ -44,7 +46,7 @@ Toda operação concluída gera automaticamente um registro em `crop.field-noteb
 - safra e talhão;
 - tipo e data da operação;
 - área executada;
-- insumos/quantidades/doses;
+- insumos, quantidades, doses e alocações de lote;
 - máquina e operador quando informados;
 - custo total e custo/ha;
 - observações;
@@ -55,7 +57,9 @@ O registro é exibido no workspace de Operações e participa da mesma transaç�
 ## Critérios de aceite
 
 - jornada ponta a ponta coberta por teste funcional;
-- rollback comprovado quando um efeito posterior falha;
+- baixa de estoque total e por lote coberta por teste;
+- rollback comprovado quando um efeito posterior falha, incluindo restauração do saldo do lote;
+- custos comprovados por talhão, cultura, operação e componentes (insumo, mão de obra, máquina e outros);
 - compatibilidade mantida com chamadas antigas que ainda enviam IDs explicitamente;
 - nenhuma dependência de SaaS ou API paga;
 - mesmos mecanismos de auditoria, backup e autenticação já existentes são preservados.

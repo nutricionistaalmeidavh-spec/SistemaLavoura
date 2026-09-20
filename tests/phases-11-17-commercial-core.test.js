@@ -41,7 +41,7 @@ test('phases 11-12 build farm > area > field > season > variety without user-fac
   assert.equal(normalizeFormValues([moneyField],{amount:'1234.56'}).amount,1234.56);
 }));
 
-test('phases 13-17 complete one agricultural command with stock, cost and field-notebook effects',async()=>withHost(async host=>{
+test('phases 13-17 complete one agricultural command with stock, lot, cost and field-notebook effects',async()=>withHost(async host=>{
   const credentials=await auth(host,'flow-admin');
   const seeded=await seedAgriculturalCore(host,credentials);
   const result=await host.backend.action({screenId:'operations',action:'complete',auth:credentials,input:{id:seeded.operation.id,completedAt:'2026-09-20T14:00:00.000Z',actualAreaHa:50,inputUsages:['Glifosato | 2 L/ha'],laborCost:100,machineCost:200,otherCost:0,notes:'Aplicação concluída sem intercorrências.'}});
@@ -50,7 +50,10 @@ test('phases 13-17 complete one agricultural command with stock, cost and field-
   assert.equal(result.payload.actualCostMinor,130000);
   assert.equal(result.payload.costPerHaMinor,2600);
   assert.equal(result.payload.inputUsages[0].quantity,100);
+  assert.equal(result.payload.inputUsages[0].allocations[0].lotNumber,'LOT-01');
   assert.equal(await host.presentation.services.inventory.available(seeded.input.id),100);
+  const trace=await host.presentation.services.inventory.trace(seeded.input.id);
+  assert.equal(trace.lots.find(lot=>lot.lotNumber==='LOT-01')?.onHand,100);
   const finance=await host.presentation.services.finance.list();
   const expense=finance.find(record=>record.payload.metadata?.operationId===seeded.operation.id);
   assert.ok(expense);assert.equal(expense.payload.amountMinor,130000);assert.equal(expense.payload.metadata.costBreakdown.inputsMinor,100000);
@@ -60,9 +63,14 @@ test('phases 13-17 complete one agricultural command with stock, cost and field-
   const operations=await host.backend.load({screenId:'operations',auth:credentials});
   assert.equal(operations.costs.byField[seeded.field.id].amountMinor,130000);
   assert.equal(operations.costs.byField[seeded.field.id].costPerHaMinor,2600);
+  assert.equal(operations.costs.byCrop.Soja,130000);
+  assert.equal(operations.costs.byCategory.inputs,100000);
+  assert.equal(operations.costs.byCategory.labor,10000);
+  assert.equal(operations.costs.byCategory.machine,20000);
+  assert.equal(operations.costs.byOperation[seeded.operation.id],130000);
 }));
 
-test('phase 13 rolls back operation and inventory when a later financial side-effect fails',async()=>withHost(async host=>{
+test('phase 13 rolls back operation, total stock and lot stock when a later financial side-effect fails',async()=>withHost(async host=>{
   const credentials=await auth(host,'rollback-admin');
   const seeded=await seedAgriculturalCore(host,credentials,{operationId:'op-rollback'});
   await host.presentation.services.finance.save(createCropExpense({id:'operation-cost:op-rollback',seasonId:seeded.season.id,fieldId:seeded.field.id,amountMinor:1,description:'Conflict fixture',category:'qa'}),{expectedVersion:0});
@@ -70,6 +78,8 @@ test('phase 13 rolls back operation and inventory when a later financial side-ef
   const operation=await host.presentation.services.repos.operations.get('op-rollback');
   assert.equal(operation.payload.status,'in-progress');
   assert.equal(await host.presentation.services.inventory.available(seeded.input.id),200);
+  const trace=await host.presentation.services.inventory.trace(seeded.input.id);
+  assert.equal(trace.lots.find(lot=>lot.lotNumber==='LOT-01')?.onHand,200);
   const notebook=await host.presentation.services.repos.fieldNotebook.list();
   assert.equal(notebook.some(record=>record.payload.operationId==='op-rollback'),false);
 }));

@@ -3,7 +3,7 @@ import { createEntityRepository } from '../shared/packages/vertical-persistence/
 import { createProductEventBus } from '../shared/packages/product-eventbus/src/index.js';
 import { createProductSettings } from '../shared/packages/product-settings/src/index.js';
 import { createAgroShellModel } from './ui.js';
-import { createCropRepositories,createFarmUnit,createFarmArea,createCropVariety,createFieldOperationType } from './catalog.js';
+import { createCropRepositories,createFarmUnit,createFarmArea,createCropVariety,createFieldOperationType,createField } from './catalog.js';
 import { scheduleFieldOperation, startFieldOperation, cancelFieldOperation, createHarvestLot, cropYieldSummary } from './operations.js';
 import { createCropExpense, createHarvestIncome, cropFinancialMetrics, agriculturalCostSummary } from './finance.js';
 import { createInventoryService } from './inventory.js';
@@ -95,7 +95,13 @@ export function createAgroLavouraPresentation({ persistence, localRuntime = null
   eventBus.subscribe('agro.inventory.receive.completed',inventoryAlertHandler);eventBus.subscribe('agro.inventory.consume.completed',inventoryAlertHandler);
   async function mutateOperation(id, transform, input) {const current=requireRecord(await repos.operations.get(id),'Field operation');return repos.operations.save(transform(current.payload,input),{expectedVersion:current.version});}
   async function ensureChecklistReady(operationId){if(await featureFlags.enabled('checklists.enforceBeforeOperationComplete')===false)return;const linked=await checklists.list({entityType:'operation',entityId:operationId});if(linked.length===0)throw new Error('A completed checklist is required before completing this operation.');if(linked.some(record=>record.payload.status!=='completed'))throw new Error('All required operation checklists must be completed first.');}
-  async function saveField(entity,options={}){const id=idFor('field',entity.id),farmUnitId=await resolveFarm(entity),areaGroupId=await resolveArea({...entity,farmUnitId});return repos.fields.save({...entity,id,farmUnitId,areaGroupId},{...options,expectedVersion:options.expectedVersion});}
+  async function saveField(entity,options={}){
+    const id=idFor('field',entity.id);
+    const validationFarmUnitId=entity.farmUnitId??(entity.farmUnitName?'__pending-farm__':null);
+    createField({...entity,id,farmUnitId:validationFarmUnitId,areaGroupId:entity.areaGroupId??null});
+    const farmUnitId=await resolveFarm(entity),areaGroupId=await resolveArea({...entity,farmUnitId});
+    return repos.fields.save({...entity,id,farmUnitId,areaGroupId},{...options,expectedVersion:options.expectedVersion});
+  }
   async function saveSeason(entity,options={}){const id=idFor('season',entity.id),varietyId=await resolveVariety(entity),budgetMinor=entity.budgetMinor??toMinor(entity.budget);return repos.seasons.save({...entity,id,productionPeriodId:entity.productionPeriodId??entity.periodName,varietyId,budgetMinor},{...options,expectedVersion:options.expectedVersion});}
   async function saveInput(entity,options={}){const id=idFor('input',entity.id),unitCostMinor=entity.unitCostMinor??toMinor(entity.unitCost);return repos.inputs.save({...entity,id,unitCostMinor},{...options,expectedVersion:options.expectedVersion});}
   async function scheduleOperation(input){const typeId=await resolveOperationType(input);return repos.operations.save(scheduleFieldOperation({...input,id:idFor('operation',input.id),typeId}),{expectedVersion:0});}

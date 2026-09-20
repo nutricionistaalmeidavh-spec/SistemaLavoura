@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,access} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {createMapPackageManager,MapPackageError,normalizeMapPackageError} from '../runtime/map-package-manager.mjs';
+import {createHash} from 'node:crypto';
+import {createMapPackageManager,MapPackageError,normalizeMapPackageError,MAP_PACKAGE_CONSTANTS} from '../runtime/map-package-manager.mjs';
 
 const exists=async path=>{try{await access(path);return true;}catch{return false;}};
+const sha=value=>createHash('sha256').update(value).digest('hex');
 const validManifest={
   schemaVersion:1,
   releaseVersion:'2026.09.1',
@@ -16,6 +18,12 @@ const validManifest={
     sha256:'a'.repeat(64),minZoom:7,maxZoom:14,bounds:[-53.2,-25.4,-44.1,-19.7],sourceDate:'2026-09-20'
   }]
 };
+
+async function prepareCli(dataDir){
+  const dir=join(dataDir,'maps','tools',`pmtiles-${MAP_PACKAGE_CONSTANTS.PMTILES_VERSION}`);
+  await mkdir(dir,{recursive:true});
+  await writeFile(join(dir,'pmtiles.exe'),'fake-cli');
+}
 
 test('P8 normalizes ENOSPC into a stable retryable map error',()=>{
   const error=normalizeMapPackageError(Object.assign(new Error('no space'),{code:'ENOSPC'}),'MAP_EXTRACT_FAILED');
@@ -77,4 +85,72 @@ test('P8 removes orphan partial PMTiles not referenced by a transaction',async()
   const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
   await manager.snapshot();
   assert.equal(await exists(partial),false);
+});
+
+test('P8 reports legacy package unverified then upgrades metadata after explicit verification',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-verify-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  await prepareCli(dataDir);
+  const id='farm-farm-1-detailed',fileName=`${id}.pmtiles`,payload=Buffer.from('legacy-pmtiles');
+  await writeFile(join(packages,fileName),payload);
+  await writeFile(join(packages,`${id}.json`),JSON.stringify({id,fileName,size:payload.length,profile:'detailed',sourceDate:'2026-09-19'}));
+  const calls=[];
+  const manager=createMapPackageManager({dataDir,platform:'win32',arch:'x64',fetchImpl:async()=>{throw new Error('network should not be needed');},execFileImpl:async(_file,args)=>{calls.push(args);return{stdout:'',stderr:''};}});
+  let snapshot=await manager.snapshot();
+  assert.equal(snapshot.installed[0].health,'unverified');
+  const verified=await manager.verifyFarmMap({id});
+  assert.equal(verified.health,'healthy');
+  assert.equal(verified.sha256,sha(payload));
+  assert.ok(calls.some(args=>args[0]==='verify'));
+  const metadata=JSON.parse(await readFile(join(packages,`${id}.json`),'utf8'));
+  assert.equal(metadata.metadataVersion,1);
+  assert.equal(metadata.sha256,sha(payload));
+  snapshot=await manager.snapshot();
+  assert.equal(snapshot.installed[0].health,'healthy');
+});
+
+test('P8 reports missing and corrupt packages without deleting metadata automatically',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-health-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  const missingId='farm-missing-detailed',missingFile=`${missingId}.pmtiles`;
+  await writeFile(join(packages,`${missingId}.json`),JSON.stringify({metadataVersion:1,id:missingId,fileName:missingFile,size:10,sha256:'a'.repeat(64),profile:'detailed'}));
+  const corruptId='farm-corrupt-detailed',corruptFile=`${corruptId}.pmtiles`;
+  await writeFile(join(packages,corruptFile),'short');
+  await writeFile(join(packages,`${corruptId}.json`),JSON.stringify({metadataVersion:1,id:corruptId,fileName:corruptFile,size:999,sha256:'b'.repeat(64),profile:'detailed'}));
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  const snapshot=await manager.snapshot();
+  const byId=new Map(snapshot.installed.map(item=>[item.id,item]));
+  assert.equal(byId.get(missingId).health,'missing');
+  assert.equal(byId.get(corruptId).health,'corrupt');
+  assert.equal(await exists(join(packages,`${missingId}.json`)),true);
+  assert.equal(await exists(join(packages,`${corruptId}.json`)),true);
+});
+
+test('P8 reports verified package outdated when cached catalog is newer without deleting it',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-outdated-'));
+  const root=join(dataDir,'maps'),packages=join(root,'packages');
+  await mkdir(packages,{recursive:true});
+  await writeFile(join(root,'catalog.json'),JSON.stringify(validManifest));
+  const id='farm-old-detailed',fileName=`${id}.pmtiles`,payload=Buffer.from('verified-map');
+  await writeFile(join(packages,fileName),payload);
+  await writeFile(join(packages,`${id}.json`),JSON.stringify({metadataVersion:1,id,fileName,size:payload.length,sha256:sha(payload),profile:'detailed',catalogVersion:'2026.09.0'}));
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  const snapshot=await manager.snapshot();
+  assert.equal(snapshot.installed[0].health,'outdated');
+  assert.equal(await exists(join(packages,fileName)),true);
+});
+
+test('P8 keeps intact PMTiles when its metadata JSON is damaged',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'lavoura-p8-metadata-damage-'));
+  const packages=join(dataDir,'maps','packages');
+  await mkdir(packages,{recursive:true});
+  const file=join(packages,'farm-damaged-detailed.pmtiles');
+  await writeFile(file,'known-good-bytes');
+  await writeFile(join(packages,'farm-damaged-detailed.json'),'{broken');
+  const manager=createMapPackageManager({dataDir,platform:'linux',arch:'x64',fetchImpl:async()=>{throw new Error('offline');}});
+  const snapshot=await manager.snapshot();
+  assert.equal(await exists(file),true);
+  assert.ok(snapshot.recoveryIssues.some(issue=>issue.code==='MAP_PACKAGE_CORRUPT'));
 });

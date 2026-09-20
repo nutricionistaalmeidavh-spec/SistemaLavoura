@@ -2,7 +2,7 @@ import {createProductSecurity} from '../shared/packages/product-security/src/ind
 
 export const SECURITY_POLICY=Object.freeze({
   admin:['*'],
-  manager:['crop:read','crop:write','inventory:read','inventory:write','finance:read','reports:read','audit:read','session:revoke'],
+  manager:['crop:read','crop:write','inventory:read','inventory:write','finance:read','reports:read','users:read','audit:read','session:revoke'],
   'field-operator':['crop:read','crop:write','inventory:read','reports:read','session:revoke'],
   warehouse:['crop:read','inventory:read','inventory:write','reports:read','session:revoke'],
   viewer:['crop:read','reports:read','session:revoke']
@@ -19,7 +19,8 @@ export const PRESENTATION_ACCESS=Object.freeze({
       read:'settings:read',
       write:'settings:write',
       actions:{backup:'backup:write',restore:'backup:restore'}
-    }
+    },
+    admin:{read:'users:read',write:'users:write'}
   })
 });
 

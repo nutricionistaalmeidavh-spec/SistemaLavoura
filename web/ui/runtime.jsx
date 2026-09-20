@@ -11,6 +11,7 @@ import {LavouraFinanceWorkspace} from './finance.jsx';
 import {LavouraHarvestWorkspace} from './harvest.jsx';
 import {LavouraReportsWorkspace} from './reports.jsx';
 import {LavouraSettingsWorkspace} from './settings.jsx';
+import {LavouraAdminWorkspace} from './admin.jsx';
 
 function Auth({backend,onAuth}){
   const [hasUsers,setHasUsers]=useState(true);
@@ -39,7 +40,8 @@ const specializedScreens={
   inventory:LavouraInventoryWorkspace,
   finance:LavouraFinanceWorkspace,
   reports:LavouraReportsWorkspace,
-  settings:LavouraSettingsWorkspace
+  settings:LavouraSettingsWorkspace,
+  admin:LavouraAdminWorkspace
 };
 
 export function LavouraProductRuntime({backend}){
@@ -51,7 +53,7 @@ export function LavouraProductRuntime({backend}){
   const [loading,setLoading]=useState(false);
 
   useEffect(()=>{if(auth)localStorage.setItem('artisys.auth',JSON.stringify(auth));else localStorage.removeItem('artisys.auth');},[auth]);
-  useEffect(()=>{if(!auth)return;let cancelled=false;backend.validate(auth).then(()=>backend.describe()).then(description=>{if(cancelled)return;setMeta(description);setScreenId(current=>current??description.navigation[0]?.id);}).catch(()=>{if(!cancelled)setAuth(null);});return()=>{cancelled=true;};},[backend,auth]);
+  useEffect(()=>{if(!auth)return;let cancelled=false;backend.validate(auth).then(()=>backend.describe(auth)).then(description=>{if(cancelled)return;setMeta(description);setScreenId(current=>current&&description.navigation.some(item=>item.id===current)?current:description.navigation[0]?.id);}).catch(()=>{if(!cancelled)setAuth(null);});return()=>{cancelled=true;};},[backend,auth]);
 
   async function load(id=screenId){if(!auth||!id)return;setLoading(true);setError('');try{const next=await backend.load({screenId:id,auth,context:{}});setData(next);return next;}catch(err){setError(err.message);throw err;}finally{setLoading(false);}}
   useEffect(()=>{if(screenId&&meta)void load(screenId).catch(()=>{});},[screenId,meta]);
@@ -59,7 +61,7 @@ export function LavouraProductRuntime({backend}){
   const descriptor=useMemo(()=>meta?.screens?.find(screen=>screen.id===screenId)??null,[meta,screenId]);
   const Specialized=resolveSpecializedScreen(descriptor,specializedScreens);
   async function logout(){try{if(auth)await backend.logout(auth);}finally{setMeta(null);setScreenId(null);setData(null);setAuth(null);}}
-  async function runAction(action,input){setError('');try{const result=await backend.action({screenId,action,input,auth,context:{}});await load(screenId);return result;}catch(err){setError(err.message);throw err;}}
+  async function runAction(action,input){setError('');try{const result=await backend.action({screenId,action,input,auth,context:{}});if(screenId==='admin'&&action==='changePassword'){setMeta(null);setScreenId(null);setData(null);setAuth(null);return result;}await load(screenId);return result;}catch(err){setError(err.message);throw err;}}
 
   if(!auth)return <Auth backend={backend} onAuth={setAuth}/>;
   if(!meta)return <div className="loading-page"><span className="loading-spinner"/>Abrindo produto…</div>;

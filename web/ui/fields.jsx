@@ -10,7 +10,7 @@ const MAP_POINT_FIELDS=Object.freeze([
   {name:'name',label:'Nome',type:'text',required:true,placeholder:'Ex.: Pluviômetro 01'},
   {name:'latitude',label:'Latitude',type:'number',required:true,step:'any'},
   {name:'longitude',label:'Longitude',type:'number',required:true,step:'any'},
-  {name:'fieldId',label:'Talhão',type:'select',required:false,optionsRef:'fieldOptions'},
+  {name:'fieldId',label:'Talhão',type:'select',required:false,optionsKey:'fieldOptions'},
   {name:'notes',label:'Observações',type:'textarea',required:false}
 ]);
 

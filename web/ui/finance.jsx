@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {getUiContract} from './contracts.js';
+import {getUiContract,hydrateUiFields,referenceLabel} from './contracts.js';
 import {DataTable,KpiStrip,Modal,PageHeader,StructuredForm,money,recordRows} from './primitives.jsx';
 
 export function buildFinanceSummary(data={}){
@@ -11,20 +11,21 @@ export function buildFinanceSummary(data={}){
   return {rows,incomeMinor,expenseMinor,resultMinor,margin};
 }
 
-const columns=[
-  {key:'direction',label:'Tipo',render:row=><span className={`status-badge ${row.direction==='income'?'status-success':'status-warning'}`}>{row.direction==='income'?'Receita':'Despesa'}</span>},
-  {key:'description',label:'Descrição'},
-  {key:'field',label:'Talhão',render:row=>row.allocation?.id??'—'},
-  {key:'season',label:'Safra',render:row=>row.metadata?.seasonId??'—'},
-  {key:'amountMinor',label:'Valor',render:row=>money(row.amountMinor)}
-];
-
 export function LavouraFinanceWorkspace({data,onRun}){
   const contract=getUiContract('finance');
+  const references=data?.references??{};
   const summary=useMemo(()=>buildFinanceSummary(data),[data]);
+  const columns=useMemo(()=>[
+    {key:'direction',label:'Tipo',render:row=><span className={`status-badge ${row.direction==='income'?'status-success':'status-warning'}`}>{row.direction==='income'?'Receita':'Despesa'}</span>},
+    {key:'description',label:'Descrição'},
+    {key:'field',label:'Talhão',render:row=>referenceLabel(references,'fieldOptions',row.allocation?.id)},
+    {key:'season',label:'Safra',render:row=>referenceLabel(references,'seasonOptions',row.metadata?.seasonId)},
+    {key:'amountMinor',label:'Valor',render:row=>money(row.amountMinor)}
+  ],[references]);
   const [actionName,setActionName]=useState(null);
   const [busy,setBusy]=useState(false);
   async function submit(values){setBusy(true);try{await onRun(actionName,values);setActionName(null);}finally{setBusy(false);}}
   const action=actionName?contract.actions[actionName]:null;
-  return <section className="product-workspace" data-testid="finance-workspace"><PageHeader eyebrow="Gestão" title="Financeiro" description="Acompanhe receitas, custos e resultado da produção agrícola." actions={<><button type="button" className="primary-button" onClick={()=>setActionName('addIncome')}>Nova receita</button><button type="button" onClick={()=>setActionName('addExpense')}>Nova despesa</button></>}/><KpiStrip items={[{label:'Receitas',value:money(summary.incomeMinor)},{label:'Despesas',value:money(summary.expenseMinor)},{label:'Resultado',value:money(summary.resultMinor)},{label:'Margem',value:`${summary.margin.toLocaleString('pt-BR',{maximumFractionDigits:1})}%`}]}/><DataTable columns={columns} rows={summary.rows} emptyTitle="Nenhum lançamento financeiro" emptyDescription="Registre receitas e despesas para acompanhar o resultado da safra."/><Modal open={Boolean(action)} title={action?.label??'Lançamento'} description="Valores são armazenados em centavos para preservar precisão." onClose={()=>setActionName(null)}><StructuredForm fields={action?.fields??[]} busy={busy} submitLabel={action?.label} onSubmit={submit} onCancel={()=>setActionName(null)}/></Modal></section>;
+  const fields=useMemo(()=>hydrateUiFields(action?.fields??[],references),[action,references]);
+  return <section className="product-workspace" data-testid="finance-workspace"><PageHeader eyebrow="Gestão" title="Financeiro" description="Acompanhe receitas, custos e resultado da produção agrícola; custos de operações entram automaticamente." actions={<><button type="button" className="primary-button" onClick={()=>setActionName('addIncome')}>Nova receita</button><button type="button" onClick={()=>setActionName('addExpense')}>Nova despesa</button></>}/><KpiStrip items={[{label:'Receitas',value:money(summary.incomeMinor)},{label:'Despesas',value:money(summary.expenseMinor)},{label:'Resultado',value:money(summary.resultMinor)},{label:'Margem',value:`${summary.margin.toLocaleString('pt-BR',{maximumFractionDigits:1})}%`}]}/><DataTable columns={columns} rows={summary.rows} emptyTitle="Nenhum lançamento financeiro" emptyDescription="Registre receitas e despesas para acompanhar o resultado da safra."/><Modal open={Boolean(action)} title={action?.label??'Lançamento'} description="Informe o valor normalmente em reais; a precisão monetária é tratada internamente." onClose={()=>setActionName(null)}><StructuredForm fields={fields} busy={busy} submitLabel={action?.label} onSubmit={submit} onCancel={()=>setActionName(null)}/></Modal></section>;
 }

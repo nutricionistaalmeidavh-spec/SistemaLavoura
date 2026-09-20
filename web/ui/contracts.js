@@ -1,10 +1,11 @@
 const field=(name,label,type='text',options={})=>Object.freeze({name,label,type,...options});
 const action=(name,label,fields=[],options={})=>Object.freeze({name,label,fields:Object.freeze(fields),...options});
+const units=['kg','L','sc','t','un','mL','g'];
 
 export const SCREEN_UI_CONTRACTS=Object.freeze({
   fields:Object.freeze({screenId:'fields',title:'Talhões',actions:Object.freeze({
     save:action('save','Salvar talhão',[
-      field('id','ID'),field('code','Código'),field('name','Nome'),field('farmUnitId','Unidade/Fazenda'),field('areaHa','Área (ha)','number',{min:0.01,step:'0.01'})
+      field('code','Código'),field('name','Nome'),field('farmUnitName','Fazenda'),field('areaName','Área/Setor (opcional)'),field('areaHa','Área (ha)','number',{min:0.01,step:'0.01'})
     ]),
     remove:action('remove','Excluir talhão',[],{confirm:true,destructive:true}),
     uploadFile:action('uploadFile','Anexar arquivo',[field('file','Arquivo','file')]),
@@ -12,34 +13,40 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
   })}),
   seasons:Object.freeze({screenId:'seasons',title:'Safras',actions:Object.freeze({
     save:action('save','Salvar safra',[
-      field('id','ID'),field('crop','Cultura'),field('productionPeriodId','Período de produção'),field('fieldIds','Talhões','tags',{help:'Separe os IDs por vírgula.'})
+      field('crop','Cultura'),field('periodName','Safra/Período','text',{help:'Ex.: 2026/27'}),field('varietyName','Cultivar'),field('cycleDays','Ciclo (dias)','number',{min:1,step:'1'}),
+      field('fieldIds','Talhões','multiselect',{optionsKey:'fieldOptions'}),field('plantingWindowStart','Início da janela de plantio','date'),field('plantingWindowEnd','Fim da janela de plantio','date'),
+      field('targetPopulation','População-alvo','number',{min:0,step:'any'}),field('expectedYieldPerHa','Meta de produtividade/ha','number',{min:0,step:'any'}),field('budget','Orçamento (R$)','money',{min:0,step:'0.01'})
     ])
   })}),
   operations:Object.freeze({screenId:'operations',title:'Operações',actions:Object.freeze({
     schedule:action('schedule','Programar operação',[
-      field('id','ID'),field('seasonId','Safra'),field('fieldId','Talhão'),field('typeId','Tipo de operação'),field('scheduledAt','Programada para','datetime-local'),field('machineAssetId','Máquina'),field('operatorPartyId','Operador')
+      field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('typeName','Tipo de operação'),field('scheduledAt','Programada para','datetime-local'),field('machineName','Máquina/Recurso'),field('operatorName','Operador')
     ]),
     start:action('start','Iniciar operação',[field('startedAt','Iniciada em','datetime-local')]),
-    complete:action('complete','Concluir operação',[field('completedAt','Concluída em','datetime-local'),field('actualCostMinor','Custo real (centavos)','number',{min:0,step:'1'}),field('notes','Observações','textarea')]),
+    complete:action('complete','Concluir operação',[
+      field('completedAt','Concluída em','datetime-local'),field('actualAreaHa','Área executada (ha)','number',{min:0.0001,step:'any'}),
+      field('inputUsages','Insumos aplicados','lines',{help:'Um por linha. Ex.: Glifosato | 2 L/ha ou Adjuvante | 5 L'}),
+      field('laborCost','Mão de obra (R$)','money',{min:0,step:'0.01'}),field('machineCost','Máquina (R$)','money',{min:0,step:'0.01'}),field('otherCost','Outros custos (R$)','money',{min:0,step:'0.01'}),field('notes','Observações','textarea')
+    ]),
     cancel:action('cancel','Cancelar operação',[field('reason','Motivo','textarea',{required:true}),field('cancelledAt','Cancelada em','datetime-local')],{confirm:true,destructive:true}),
-    savePlan:action('savePlan','Salvar planejamento',[field('id','ID'),field('name','Nome'),field('startsAt','Início','datetime-local'),field('endsAt','Fim','datetime-local'),field('resourceIds','Recursos','tags')]),
-    createChecklist:action('createChecklist','Criar checklist',[field('id','ID'),field('operationId','Operação'),field('title','Título'),field('items','Itens obrigatórios','lines')]),
+    savePlan:action('savePlan','Salvar planejamento',[field('name','Nome'),field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('startsAt','Início','datetime-local'),field('endsAt','Fim','datetime-local'),field('resourceIds','Recursos','tags')]),
+    createChecklist:action('createChecklist','Criar checklist',[field('title','Título'),field('items','Itens obrigatórios','lines')]),
     setChecklistItem:action('setChecklistItem','Atualizar item',[field('itemId','Item'),field('checked','Concluído','checkbox')]),
     completeChecklist:action('completeChecklist','Concluir checklist',[],{confirm:true})
   })}),
   inputs:Object.freeze({screenId:'inputs',title:'Insumos',actions:Object.freeze({
-    save:action('save','Salvar insumo',[field('id','ID'),field('name','Nome'),field('unit','Unidade'),field('category','Categoria'),field('unitCostMinor','Custo unitário (centavos)','number',{min:0,step:'1'})])
+    save:action('save','Salvar insumo',[field('name','Nome'),field('unit','Unidade','select',{options:units}),field('category','Categoria'),field('unitCost','Custo unitário (R$)','money',{min:0,step:'0.01'}),field('brand','Marca'),field('activeIngredient','Ingrediente ativo')])
   })}),
   harvest:Object.freeze({screenId:'harvest',title:'Colheita',actions:Object.freeze({
-    create:action('create','Registrar colheita',[field('id','ID'),field('seasonId','Safra'),field('fieldId','Talhão'),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('unit','Unidade'),field('areaHa','Área colhida (ha)','number',{min:0.0001,step:'any'}),field('harvestedAt','Data da colheita','datetime-local')])
+    create:action('create','Registrar colheita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('areaHa','Área colhida (ha)','number',{min:0.0001,step:'any'}),field('harvestedAt','Data da colheita','datetime-local')])
   })}),
   inventory:Object.freeze({screenId:'inventory',title:'Estoque',actions:Object.freeze({
-    receive:action('receive','Registrar entrada',[field('id','ID do movimento'),field('sku','SKU/Insumo'),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('expiresAt','Validade','date'),field('reference','Referência'),field('occurredAt','Data','datetime-local')]),
-    consume:action('consume','Registrar saída',[field('id','ID do movimento'),field('sku','SKU/Insumo'),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('reference','Referência'),field('occurredAt','Data','datetime-local')])
+    receive:action('receive','Registrar entrada',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('expiresAt','Validade','date'),field('reference','Referência'),field('occurredAt','Data','datetime-local')]),
+    consume:action('consume','Registrar saída',[field('sku','Insumo','select',{optionsKey:'inputOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('lotNumber','Lote'),field('reference','Referência'),field('occurredAt','Data','datetime-local')])
   })}),
   finance:Object.freeze({screenId:'finance',title:'Financeiro',actions:Object.freeze({
-    addExpense:action('addExpense','Nova despesa',[field('id','ID'),field('seasonId','Safra'),field('fieldId','Talhão'),field('amountMinor','Valor (centavos)','number',{min:1,step:'1'}),field('description','Descrição'),field('category','Categoria')]),
-    addIncome:action('addIncome','Nova receita',[field('id','ID'),field('seasonId','Safra'),field('fieldId','Talhão'),field('amountMinor','Valor (centavos)','number',{min:1,step:'1'}),field('description','Descrição'),field('partyId','Cliente/Parte')])
+    addExpense:action('addExpense','Nova despesa',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('category','Categoria')]),
+    addIncome:action('addIncome','Nova receita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('partyId','Cliente/Parte')])
   })}),
   reports:Object.freeze({screenId:'reports',title:'Relatórios',actions:Object.freeze({
     csv:action('csv','Gerar CSV',[field('type','Relatório','select',{options:['season-summary','field-operations','traceability']}),field('rows','Linhas','lines')]),
@@ -63,6 +70,8 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
 });
 
 export function getUiContract(screenId){return SCREEN_UI_CONTRACTS[String(screenId)]??null;}
+export function hydrateUiFields(fields=[],references={}){return fields.map(definition=>definition.optionsKey?Object.freeze({...definition,options:references?.[definition.optionsKey]??[]}):definition);}
+export function referenceLabel(references,key,value){const found=(references?.[key]??[]).find(option=>String(option.value)===String(value));return found?.label??String(value??'—');}
 
 export function parseCsvText(csv=''){
   const lines=String(csv).split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
@@ -75,9 +84,10 @@ export function normalizeFormValues(fields=[],values={}){
   const result={};
   for(const definition of fields){
     let value=values[definition.name];
-    if(definition.type==='number')value=value===''||value==null?null:Number(value);
+    if(definition.type==='number'||definition.type==='money')value=value===''||value==null?null:Number(value);
     else if(definition.type==='checkbox')value=Boolean(value);
     else if(definition.type==='tags')value=String(value??'').split(',').map(item=>item.trim()).filter(Boolean);
+    else if(definition.type==='multiselect')value=Array.isArray(value)?value.map(String).filter(Boolean):String(value??'').split(',').map(item=>item.trim()).filter(Boolean);
     else if(definition.type==='lines')value=String(value??'').split(/\r?\n/).map(item=>item.trim()).filter(Boolean);
     else if((definition.type==='datetime-local'||definition.type==='date')&&value)value=new Date(value).toISOString();
     if(value!==''&&value!=null)result[definition.name]=value;

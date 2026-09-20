@@ -94,3 +94,8 @@ test('P3 UI and both runtimes use the agricultural presentation decorator',()=>{
   assert.match(browser,/presentation-p3\.js/);
   assert.match(desktop,/presentation-p3\.js/);
 });
+
+test('CI serializes browser certification to avoid Windows socket exhaustion',()=>{
+  const config=fs.readFileSync(new URL('../playwright.config.mjs',import.meta.url),'utf8');
+  assert.match(config,/workers:process\.env\.CI\?1:undefined/);
+});

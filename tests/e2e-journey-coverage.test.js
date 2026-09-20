@@ -44,6 +44,11 @@ test('P4 and P5 published screens have real runtime renderers',()=>{
   assert.match(runtime,/'offline-maps':LavouraOfflineMaps/);
 });
 
+test('structured numeric inputs accept normal decimal values when no explicit step is declared',()=>{
+  const primitives=read('web/ui/primitives.jsx');
+  assert.match(primitives,/definition\.step\?\?\(\['number','money'\]\.includes\(definition\.type\)\?'any':undefined\)/);
+});
+
 test('browser journeys and successful-run visual evidence are part of the release suite',()=>{
   for(const file of [
     'tests/e2e/action-matrix.spec.mjs',

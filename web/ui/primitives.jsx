@@ -33,8 +33,8 @@ function FieldControl({definition,value,onChange}){
   if(definition.type==='multiselect')return <select id={common.id} name={common.name} multiple value={Array.isArray(value)?value:[]} onChange={event=>onChange(Array.from(event.target.selectedOptions,option=>option.value))}>{(definition.options??[]).map(option=>{const item=typeof option==='object'?option:{label:String(option),value:option};return <option key={String(item.value)} value={item.value}>{item.label}</option>;})}</select>;
   if(definition.type==='checkbox')return <label className="toggle-field"><input id={common.id} name={common.name} type="checkbox" checked={Boolean(value)} onChange={event=>onChange(event.target.checked)}/><span>Ativo</span></label>;
   if(definition.type==='file')return <input id={common.id} name={common.name} type="file" onChange={event=>onChange(event.target.files?.[0]??null)}/>;
-  const type=['number','money','date','datetime-local'].includes(definition.type)?(definition.type==='money'?'number':definition.type):'text';
-  return <input {...common} type={type} min={definition.min} step={definition.step}/>;
+  const type=definition.type==='password'?'password':['number','money','date','datetime-local'].includes(definition.type)?(definition.type==='money'?'number':definition.type):'text';
+  return <input {...common} type={type} min={definition.min} step={definition.step} autoComplete={definition.autoComplete}/>;
 }
 
 export function StructuredForm({fields=[],initialValues={},submitLabel='Salvar',busy=false,onSubmit,onCancel=null,transform=null,testId='structured-form'}){

@@ -14,15 +14,16 @@ P8 is complete when the product can demonstrate all of the following:
 2. Startup/snapshot reconciliation can recover a valid backup after an interrupted replacement and can remove stale temporary files safely.
 3. Disk-space failures are detected before installation when possible and are translated into stable, actionable errors if the operating system reports `ENOSPC` during work.
 4. A newly generated PMTiles file is verified before promotion and receives locally stored integrity metadata.
-5. An installed package can be explicitly checked later and reported as healthy, unverified, missing, corrupt, or outdated without deleting the user's last known-good package automatically.
+5. An installed package can be explicitly verified later and reported as healthy, unverified, missing, corrupt, or outdated without deleting the user's last known-good package automatically.
 6. Catalog refresh validates the complete existing manifest contract instead of accepting only `schemaVersion` plus `maps`.
-7. A farm whose bounds cross more than one state is accepted only when the available catalog-bound coverage covers the complete farm bounds; partial coverage fails closed with a clear reason.
+7. A farm whose bounds cross more than one state is accepted only when the available catalog coverage covers the complete farm bounds; partial coverage fails closed with a clear reason.
 8. Invalid WGS84 coordinates, degenerate polygon rings, and self-intersecting field boundaries are rejected at GIS normalization boundaries.
-9. Corrupt legacy field geometry cannot crash the whole agricultural map; invalid fields are surfaced as unmapped/invalid while valid fields continue rendering.
-10. Building the agricultural map snapshot scales approximately linearly with field-related records rather than repeatedly scanning every collection for every field.
-11. The PWA/mobile fallback still works without a desktop map provider or installed PMTiles package.
-12. A clean Windows x64 data directory can initialize, install, verify, replace, recover, and remove a regional map package.
-13. P0-P7 regression gates remain green on Linux and Windows.
+9. Existing valid manual field polygons that were persisted without a repeated closing coordinate remain readable; the read model may close a copy in memory for validation/rendering but must not silently rewrite persistence.
+10. Corrupt legacy field geometry cannot crash the whole agricultural map; invalid fields are surfaced as unmapped/invalid while valid fields continue rendering.
+11. Building the agricultural map snapshot scales approximately linearly with field-related records rather than repeatedly scanning every collection for every field.
+12. The PWA/mobile fallback still works without a desktop map provider or installed PMTiles package.
+13. A clean Windows x64 data directory can initialize, install, verify, replace, recover, and remove a regional map package.
+14. P0-P7 regression gates remain green on Linux and Windows.
 
 ## Current-State Findings
 
@@ -36,52 +37,17 @@ The current implementation already provides important foundations:
 
 The remaining P8 work is therefore hardening, not a replacement of the map architecture.
 
-## Approaches Considered
+## Selected Approach
 
-### A. Layered hardening of the existing modules — selected
+P8 uses layered hardening of the existing modules. The current `map-package-manager`, planner, GIS domain, presentation layer, and UI contracts remain in place, with explicit recovery/integrity primitives added at their existing boundaries.
 
-Keep the current `map-package-manager`, planner, GIS domain, presentation layer, and UI contracts, and add explicit recovery/integrity primitives at their current boundaries.
-
-Advantages:
-- smallest regression surface;
-- preserves P0-P7 contracts;
-- no new runtime service or database;
-- straightforward unit and integration testing;
-- compatible with the one-time, local-first product model.
-
-Trade-off:
-- recovery state remains filesystem-based rather than being represented by a dedicated transactional database.
-
-### B. New persistent map-job subsystem
-
-Introduce a separate job database/state machine for queued downloads, retries, cancellation, recovery, and package inventory.
-
-Advantages:
-- strongest basis for future background download orchestration.
-
-Trade-offs:
-- substantially larger subsystem;
-- migration and lifecycle complexity;
-- unnecessary for P8's current success criteria;
-- larger regression surface around Electron startup and persistence.
-
-### C. Minimal test-only hardening
-
-Add more tests and a few catch blocks without introducing integrity status, startup reconciliation, or strict topology validation.
-
-Advantages:
-- smallest code change.
-
-Trade-off:
-- does not actually solve process interruption, stale backups, corrupt installed packages, or geometry failures.
-
-P8 selects approach A.
+This minimizes regression risk, preserves P0-P7 contracts, introduces no new runtime service/database, and fits the one-time local-first product model. A separate persistent map-job subsystem is deliberately out of scope.
 
 ## Architecture
 
 ### 1. Stable Map Package Error Model
 
-`runtime/map-package-manager.mjs` will expose a `MapPackageError` with stable `code`, human-readable `message`, and `retryable` metadata.
+`runtime/map-package-manager.mjs` exposes a `MapPackageError` with stable `code`, human-readable `message`, and `retryable` metadata.
 
 Initial codes:
 
@@ -98,19 +64,11 @@ Initial codes:
 - `MAP_PACKAGE_CORRUPT`
 - `MAP_RECOVERY_FAILED`
 
-Raw platform errors remain available as `cause`, but UI/presentation code must not need to parse OS-specific strings.
-
-No error code changes the local agricultural data. A failed map operation affects only the optional basemap package.
+Raw platform errors remain available as `cause`, but UI/presentation code does not need to parse OS-specific strings.
 
 ### 2. Installation Transaction and Recovery
 
-The package directory remains the source of truth for offline map files. Each package uses:
-
-- final PMTiles file;
-- metadata JSON;
-- temporary `.part-*` file during extraction;
-- `.bak` file only during replacement;
-- lightweight transaction journal JSON while promotion is in progress.
+Each package uses a final PMTiles file, metadata JSON, temporary `.part-*` file, `.bak` only during replacement, and a lightweight transaction journal JSON.
 
 Promotion order:
 
@@ -118,27 +76,18 @@ Promotion order:
 2. extract to unique temp path;
 3. `pmtiles verify` temp path;
 4. reject empty output;
-5. compute SHA-256 and size of temp package;
+5. compute SHA-256 and size;
 6. write transaction journal atomically;
-7. move current final file to backup if it exists;
-8. rename verified temp file to final;
-9. write package metadata atomically;
-10. remove backup and transaction journal.
+7. move current final to backup if present;
+8. rename verified temp to final;
+9. write metadata atomically;
+10. remove backup and journal.
 
-If any step fails, cleanup is best-effort and the previous known-good final package is restored whenever possible.
-
-On `init()`/`snapshot()`, reconciliation will inspect transaction journals and known backup/temp naming patterns:
-
-- final missing + backup present -> restore backup;
-- final present + backup present -> keep final and remove backup only after final metadata/file checks pass;
-- stale temp with no active in-process install -> remove temp;
-- journal with no recoverable final/backup -> retain evidence, surface `MAP_RECOVERY_FAILED`, and do not invent a successful package.
-
-The product never replaces a known-good final file with an unverified file.
+Startup/snapshot reconciliation restores a backup if the final is missing, removes stale temp files, keeps a valid final if present, and preserves evidence when no safe recovery is possible. A known-good final is never replaced by an unverified file.
 
 ### 3. Local Integrity Metadata
 
-Package metadata schema gains a versioned local integrity block:
+Metadata schema gains:
 
 ```json
 {
@@ -151,9 +100,9 @@ Package metadata schema gains a versioned local integrity block:
 }
 ```
 
-`snapshot()` performs cheap reconciliation based on metadata/file existence and size. It does not hash multi-gigabyte files on every screen load.
+`snapshot()` performs cheap file/size/version checks and does not hash multi-gigabyte files on every screen load.
 
-A new `verifyFarmMap({id})` action returns package health:
+`verifyFarmMap({id})` performs explicit PMTiles + SHA verification and returns one of:
 
 - `healthy`
 - `unverified`
@@ -161,230 +110,68 @@ A new `verifyFarmMap({id})` action returns package health:
 - `corrupt`
 - `outdated`
 
-For metadata version 1 packages, verification checks current file size and SHA-256 against the values captured after the successful structural `pmtiles verify` performed during installation. If the PMTiles CLI is already present locally, the explicit verification may also run structural `pmtiles verify`; it must not download the CLI or require network solely to validate an already installed package.
-
-For legacy metadata without SHA-256, explicit verification computes local integrity metadata when a local PMTiles CLI is already available. If no local CLI exists, the package remains `unverified` and usable; P8 does not force a network download merely to upgrade metadata.
-
-`outdated` means the package remains usable but the cached/published catalog has a newer relevant source/catalog version. P8 does not auto-delete or auto-update an outdated package.
+Pre-P8 metadata without SHA remains readable and is `unverified` until explicit verification upgrades it locally. Verification is local and does not require network access when the PMTiles CLI is already present; the product must not require re-downloading a valid old package solely to add integrity metadata.
 
 ### 4. Catalog Validation and Offline Fallback
 
-`refreshCatalog()` must use the same semantic manifest validator used by the planner. Invalid remote catalogs do not overwrite the last valid cached catalog.
-
-If the network is unavailable:
-
-- a valid cached catalog remains usable for planning/status;
-- a direct regional extraction that needs network fails with `MAP_SOURCE_UNAVAILABLE`;
-- already installed packages remain usable;
-- explicit verification of a version-1 package remains local;
-- field mode and local agricultural data remain usable.
-
-The product never treats a malformed downloaded manifest as valid merely because it is JSON.
+Remote catalog refresh uses the same semantic manifest validator as planning. Invalid remote content never overwrites the last valid cache. Network failure leaves already installed maps and field-mode data usable.
 
 ### 5. Disk-Space Robustness
 
-The existing `statfs` preflight remains, with two refinements:
-
-- required bytes are derived from the best available estimate and include replacement/temporary overhead;
-- any filesystem `ENOSPC`/equivalent encountered during CLI preparation, extraction promotion, metadata write, or recovery is normalized to `MAP_DISK_FULL`.
-
-A disk-space failure must leave no promoted partial package and must preserve the previous final package if one existed.
-
-If filesystem capacity cannot be measured, the operation may proceed, but runtime `ENOSPC` remains fail-closed.
+Existing `statfs` preflight remains. Runtime `ENOSPC` from CLI preparation, extraction, promotion, metadata write, or recovery is normalized to `MAP_DISK_FULL`. A disk-space failure preserves the previous final package whenever one existed.
 
 ### 6. Multi-State Coverage
 
-`buildFarmMapDownloadPlan()` continues selecting all intersecting available state packages, but P8 adds a complete-coverage check using the geographic `bounds` declared by the published map catalog.
+Planning selects all intersecting available state packages, then verifies that their published `bounds` union covers the entire farm bounding rectangle. This is catalog-bounds coverage, not cadastral state-boundary validation.
 
-A plan is valid only if the union of available non-national package rectangles covers the complete farm bounding rectangle. This prevents a farm that crosses an unavailable catalog region from being accepted because another intersecting state happened to be available.
-
-This is a package-coverage check, not cadastral validation of exact Brazilian state borders. Exact jurisdiction boundaries are outside P8 because the current distribution contract publishes rectangular bounds, not authoritative state polygons.
-
-The output remains one farm-region PMTiles extraction. State packages are catalog/coverage inputs, not separately exposed farm files.
-
-For a fully covered cross-state farm, `sources` contains every contributing state package in stable deterministic order.
+Exact shared rectangle edges count as covered. Partial cross-state coverage fails closed.
 
 ### 7. GIS Topology Validation
 
-`src/gis-import.js` will add deterministic polygon-ring validation without a paid/external GIS service.
+Polygon/MultiPolygon rings require valid WGS84 coordinates, closure, at least three distinct non-closing vertices, non-zero area, and no non-adjacent segment self-intersection. Redundant collinear points are allowed when the ring still has non-zero area and no self-crossing.
 
-For Polygon/MultiPolygon rings:
+Full cadastral topology repair, hole containment repair, and neighboring-field overlap correction remain out of scope.
 
-- WGS84 ranges remain mandatory;
-- ring must be closed;
-- at least three distinct non-closing vertices are required;
-- zero-area/degenerate rings are rejected;
-- non-adjacent segments may not self-intersect;
-- adjacent segments may meet only at their shared endpoint.
+### 8. Safe Handling of Existing Manual/Legacy Geometry
 
-P8 does not attempt full cadastral topology rules such as validating that every hole is contained in its outer ring or resolving overlapping neighboring fields. Those can be a later precision-GIS phase.
+The agricultural read model uses a compatibility adapter for stored field boundaries. A valid manual ring persisted by earlier phases without a repeated closing point is copied and closed in memory before topology validation. The persisted record is not changed automatically.
 
-`geometryForField()` therefore cannot persist a self-intersecting boundary through the P6 import flow.
-
-### 8. Safe Handling of Legacy/Corrupt Geometry
-
-The agricultural read model must not silently discard malformed coordinates and then render a different polygon.
-
-`src/agricultural-map.js` will use strict geometry normalization for mapped field boundaries. If an old/local record is invalid:
-
-- the record is not rendered as a polygon;
-- the field appears in `unmappedFields` with an `invalidGeometry` reason;
-- the rest of the map snapshot is still generated.
-
-This keeps the UI available while making bad data visible instead of mutating it silently.
+Malformed/out-of-range/self-crossing legacy geometry is not rendered. The field appears in `unmappedFields` with an invalid-geometry reason, while the rest of the map continues to render.
 
 ### 9. Large Dataset Performance
 
-`buildAgriculturalMapSnapshot()` will pre-index related collections by `fieldId` once:
+`buildAgriculturalMapSnapshot()` pre-indexes related collections by `fieldId` once: scouting, files, rainfall, operations, applications, and geometries. Field assembly uses these indexes rather than filtering each full collection for every field.
 
-- scouting;
-- files;
-- rainfall;
-- operations;
-- applications;
-- geometries.
-
-Field assembly then reads from these indexes rather than filtering every full collection for each field.
-
-The target complexity is `O(fields + related records)` for relationship lookup, excluding unavoidable geometry point traversal and final serialization.
-
-A stress regression test will build a snapshot with thousands of fields and related records and verify complete counts and bounded execution. Timing thresholds must be generous enough to avoid CI flakiness; the principal regression protection is the indexed implementation plus large-fixture completion.
+Target lookup complexity is `O(fields + related records)`, excluding geometry point traversal and serialization. A 5,000-field stress regression protects this structure with a generous CI timing ceiling.
 
 ### 10. Presentation and UI
 
-`src/presentation-p5.js` adds `verifyFarmMap` to the offline-map screen contract and passes catalog version metadata into installation when available.
+`src/presentation-p5.js` adds `verifyFarmMap`. `web/ui/offline-maps.jsx` displays health states and actionable guidance, including `Verificar integridade`, retry through existing installation, removal, and catalog refresh.
 
-`web/ui/offline-maps.jsx` displays package health and actionable states:
-
-- verified/healthy;
-- unverified legacy package;
-- update available;
-- package missing;
-- integrity problem.
-
-Actions:
-
-- retry installation by running the existing install action again;
-- explicit `Verificar integridade` for an installed package;
-- remove package;
-- refresh catalog.
-
-The UI will map stable error codes to Portuguese guidance instead of relying on regex over raw English error text. Raw technical details are not required for normal operation.
-
-On PWA/mobile, desktop-only controls remain disabled and the existing message that field mode continues with locally stored agricultural data remains visible.
+PWA/mobile keeps desktop package actions unavailable and retains field-mode usability.
 
 ### 11. Clean Windows Behavior
 
-A clean Windows x64 environment is a first-class P8 regression scenario:
-
-- no `maps` directory;
-- no CLI;
-- no cached catalog;
-- no installed package.
-
-The manager must create required directories, verify the downloaded CLI archive before use, install a farm package atomically, verify it, replace it safely, and remove it.
-
-Tests use injected filesystem/network/CLI behavior where practical; the Windows release gate still exercises actual Electron/NSIS packaging.
+A clean Windows x64 environment remains a first-class P8 scenario: no maps directory, CLI, catalog, or package. The manager must initialize, verify CLI download, install atomically, verify, replace, recover, and remove a package. Existing Windows release certification remains mandatory.
 
 ## Data Compatibility
 
-Existing package metadata without `metadataVersion`/`sha256` remains readable.
+Existing map metadata without integrity fields remains readable as `unverified`. Existing valid manual field geometry remains readable even if stored unclosed; validation closes a copy in memory without rewriting persistence. Invalid legacy geometry is surfaced as invalid/unmapped.
 
-Such packages are reported as `unverified`. If the local PMTiles CLI is already present, successful explicit structural verification computes SHA-256 and upgrades metadata in place to version 1. If the CLI is absent, P8 leaves the package unverified rather than requiring network access. P8 must not require users to redownload a valid pre-P8 package solely because metadata is older.
-
-Existing field geometry records remain readable. Invalid legacy geometry is surfaced as invalid/unmapped rather than automatically rewritten.
-
-No SQLite migration is required for P8 because map-package transaction/integrity state remains filesystem-local and GIS structures remain in the existing persistence collections.
+No SQLite migration is required.
 
 ## Testing Strategy
 
-### Unit/domain
+`tests/p8-map-robustness.test.js` covers stable error normalization, disk failures, transaction recovery, stale temp cleanup, health states, explicit integrity upgrade, invalid catalog preservation, complete/partial multi-state coverage, topology rejection, legacy geometry compatibility, invalid-geometry degradation, 5,000-field snapshot completion, and P6/P7/P8 browser-process isolation.
 
-Add `tests/p8-map-robustness.test.js` covering:
+`tests/e2e/p8-map-robustness.spec.mjs` covers browser-visible PWA fallback. P8 runs in a fresh Playwright process after baseline P0-P5, P6, and P7.
 
-- stable error normalization;
-- disk preflight failure;
-- runtime `ENOSPC` cleanup;
-- interrupted replacement recovery;
-- stale temp cleanup;
-- missing/corrupt/unverified package status;
-- local explicit integrity verification and metadata upgrade;
-- verification without network requirement for version-1 metadata;
-- invalid catalog preserving cached valid catalog;
-- full cross-state catalog-bound coverage;
-- partial cross-state coverage rejection;
-- self-intersecting polygon rejection;
-- degenerate polygon rejection;
-- legacy invalid geometry safe degradation;
-- thousands-of-fields map snapshot completion and counts.
-
-Extend existing P4/P5, P6, and agricultural-map tests where the assertion belongs to an existing contract.
-
-### E2E
-
-Add `tests/e2e/p8-map-robustness.spec.mjs` for browser-visible fallback/status behavior that does not require a real Windows PMTiles process.
-
-P8 E2E runs in a fresh Playwright segment, just like P6/P7, to avoid service-worker/browser-state contamination discovered during the previous certification fix.
-
-### CI
-
-Add `.github/workflows/p8-map-robustness.yml`:
-
-- Node 22;
-- full unit/contract suite;
-- web build;
-- Chromium install;
-- P8 E2E;
-- compatibility contract.
-
-P0/P1/P2 continue to run unchanged and remain the release gates. P8 changes to `qa:web` must preserve P6/P7 process isolation.
-
-## Files Expected to Change
-
-Primary:
-
-- `runtime/map-package-manager.mjs`
-- `src/map-package-planner.js`
-- `src/gis-import.js`
-- `src/agricultural-map.js`
-- `src/presentation-p5.js`
-- `web/ui/offline-maps.jsx`
-- `tooling/qa-web.mjs`
-- `tests/map-package-manager.test.js`
-- `tests/p4-p5-field-offline.test.js`
-- `tests/p6-gis-import.test.js`
-- `tests/p8-map-robustness.test.js`
-- `tests/e2e/p8-map-robustness.spec.mjs`
-- `.github/workflows/p8-map-robustness.yml`
-- `docs/PRODUCT_STATUS.md` and/or `PRODUCT_STATUS.md`
-
-Secondary files may change only when required by an existing contract or test fixture.
+`.github/workflows/p8-map-robustness.yml` runs Node 22 unit/contracts, web build, Chromium P8 E2E, and compatibility. P0/P1/P2 remain the commercial Linux/Windows release gates.
 
 ## Non-Goals
 
-P8 does not add:
-
-- satellite provider accounts;
-- new paid APIs;
-- an ArtiSys cloud backend;
-- automatic background updates of map packages;
-- full download pause/resume protocol;
-- cadastral-grade polygon topology repair;
-- automatic field-boundary correction;
-- map-package distribution changes in `mapasbrasilrelease`;
-- machinery/fleet duplication;
-- fiscal or finance features.
+P8 does not add satellite accounts, paid APIs, ArtiSys cloud backend, automatic background map updates, full pause/resume download protocol, cadastral-grade topology repair, automatic field-boundary correction, `mapasbrasilrelease` distribution changes, machinery/fleet duplication, or fiscal/finance features.
 
 ## Release Gate
 
-P8 may be merged only when:
-
-1. P8-specific unit/domain tests are green;
-2. P8 E2E is green;
-3. P6 and P7 E2E remain green in their isolated segments;
-4. P0 Linux regression/compatibility is green;
-5. P0 Windows `release:certify` is green and produces the installer artifact;
-6. P1 and P2 gates remain green;
-7. no mandatory paid dependency has been introduced.
-
-A passing P8-specific workflow alone is not sufficient for commercial certification.
+P8 merges only when P8 unit/domain/E2E are green, P6/P7 isolated E2E remain green, P0 Linux regression/compatibility is green, P0 Windows `release:certify` is green with installer artifact, P1/P2 remain green, and no mandatory paid dependency is introduced.

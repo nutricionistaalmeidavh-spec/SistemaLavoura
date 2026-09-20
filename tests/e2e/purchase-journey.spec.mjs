@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {captureStep,createInput,enterProduct,fillLines,submitDialog} from './evidence-helpers.mjs';
+import {captureStep,createInput,enterProduct,fillLines,selectOptionContaining,submitDialog} from './evidence-helpers.mjs';
 
 const password=['Purchase','Journey','2026!'].join('-');
 
@@ -28,7 +28,7 @@ test('purchase-lifecycle: fornecedor, pedido, recebimento e entrada no estoque',
 
   await page.getByRole('button',{name:'Receber pedido',exact:true}).click();
   dialog=page.getByRole('dialog');
-  await dialog.locator('#field-id').selectOption({label:/Fornecedor Compras E2E/});
+  await selectOptionContaining(dialog.locator('#field-id'),'Fornecedor Compras E2E');
   await dialog.getByLabel('Armazém',{exact:true}).fill('Principal');
   await submitDialog(dialog,'Receber pedido');
   await captureStep(page,testInfo,'pedido-recebido');

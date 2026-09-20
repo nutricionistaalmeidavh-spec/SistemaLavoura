@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {captureStep,createInput,enterProduct} from './evidence-helpers.mjs';
+import {captureStep,createInput,enterProduct,fillLines,submitDialog} from './evidence-helpers.mjs';
 
 const password=['Purchase','Journey','2026!'].join('-');
 
@@ -14,15 +14,15 @@ test('purchase-lifecycle: fornecedor, pedido, recebimento e entrada no estoque',
   await dialog.getByLabel('CPF/CNPJ',{exact:true}).fill('DOC-E2E-01');
   await dialog.getByLabel('Telefone',{exact:true}).fill('0000000000');
   await dialog.getByLabel('E-mail',{exact:true}).fill('fornecedor@example.test');
-  await dialog.getByRole('button',{name:'Novo fornecedor',exact:true}).click();
+  await submitDialog(dialog,'Novo fornecedor');
   await expect(page.getByText(/1 fornecedor/).first()).toBeVisible();
   await captureStep(page,testInfo,'fornecedor-criado');
 
   await page.getByRole('button',{name:'Pedido de compra',exact:true}).click();
   dialog=page.getByRole('dialog');
   await dialog.locator('#field-supplierId').selectOption({label:'Fornecedor Compras E2E'});
-  await dialog.getByLabel('Itens do pedido',{exact:true}).fill('Insumo Compras E2E | 15 | 10,50');
-  await dialog.getByRole('button',{name:'Novo pedido de compra',exact:true}).click();
+  await fillLines(dialog,'Itens do pedido','Insumo Compras E2E | 15 | 10,50');
+  await submitDialog(dialog,'Novo pedido de compra');
   await expect(page.getByText(/1 pedido/).first()).toBeVisible();
   await captureStep(page,testInfo,'pedido-criado');
 
@@ -30,7 +30,7 @@ test('purchase-lifecycle: fornecedor, pedido, recebimento e entrada no estoque',
   dialog=page.getByRole('dialog');
   await dialog.locator('#field-id').selectOption({label:/Fornecedor Compras E2E/});
   await dialog.getByLabel('Armazém',{exact:true}).fill('Principal');
-  await dialog.getByRole('button',{name:'Receber pedido',exact:true}).click();
+  await submitDialog(dialog,'Receber pedido');
   await captureStep(page,testInfo,'pedido-recebido');
 
   await page.getByTestId('nav-inventory').click();

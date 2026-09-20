@@ -28,8 +28,13 @@ try{
   const dbPath=join(root,contract.databaseFile);
   if(legacyDb){await stat(legacyDb);await copyFile(legacyDb,dbPath);line('PASS','Banco legado copiado para sandbox',legacyDb);}
   host=await createStandaloneHost({dataDir:root});
-  const meta=await host.backend.describe();assert.equal(meta.productId,contract.productId);assert.deepEqual(meta.navigation.map(x=>x.id),contract.screens);
-  assert.equal((await host.persistence.health()).ok,true);summary.checks.runtimeOpen=true;line('PASS','Abertura standalone','runtime e navegação compatíveis');
+  const meta=await host.backend.describe();
+  assert.equal(meta.productId,contract.productId);
+  const navigation=meta.navigation.map(x=>x.id);
+  assert.deepEqual(navigation.slice(0,contract.screens.length),contract.screens,'contracted screens must preserve their original order');
+  assert.equal(new Set(navigation).size,navigation.length,'navigation screen ids must remain unique');
+  for(const screenId of contract.screens)assert.ok(navigation.includes(screenId),`contracted screen missing from runtime: ${screenId}`);
+  assert.equal((await host.persistence.health()).ok,true);summary.checks.runtimeOpen=true;summary.navigation=navigation;line('PASS','Abertura standalone','runtime compatível com telas aditivas');
   await host.close();host=null;
   db=new DatabaseSync(dbPath,{readOnly:true});
   const owner=db.prepare("SELECT value FROM __artisys_meta WHERE key='product_id'").get();assert.equal(owner?.value,contract.productId);

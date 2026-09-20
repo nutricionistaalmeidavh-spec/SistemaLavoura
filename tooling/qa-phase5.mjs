@@ -13,7 +13,7 @@ const credential=['Qa','Standalone','2026!'].join('-');
 const line=(s,l,d='')=>process.stdout.write(`[${s}] ${l}${d?` - ${d}`:''}\n`);
 const actionKey=(screenId,action)=>`${screenId}.${action}`;
 const declaredActions=Object.entries(contract.actions).flatMap(([screenId,actions])=>actions.map(action=>actionKey(screenId,action)));
-const assertSubset=(actual,expected,label)=>{for(const item of expected)assert.ok(actual.includes(item),`${label} missing contracted action ${item}`);};
+const assertSubset=(actual,expected,label)=>{for(const item of expected)assert.ok(actual.includes(item),`${label} missing contracted item ${item}`);};
 let root,host;
 const exercised=new Set(),passed=new Set(),failures=[];
 const summary={phase:5,productId:contract.productId,status:'failed',screens:[],checks:{},actionCoverage:{declared:declaredActions.length,exercised:0,passed:0,failed:[],untested:[...declaredActions],results:[]},commit:await currentCommit()};
@@ -31,8 +31,8 @@ try{
 
   const meta=await host.backend.describe();
   assert.equal(meta.productId,contract.productId);
-  assert.deepEqual(meta.navigation.map(x=>x.id),contract.screens);
-  assert.deepEqual(meta.screens.map(x=>x.id),contract.screens);
+  assertSubset(meta.navigation.map(x=>x.id),contract.screens,'navigation');
+  assertSubset(meta.screens.map(x=>x.id),contract.screens,'screens');
   for(let i=0;i<contract.screens.length;i+=1){
     const id=contract.screens[i];await host.backend.load({screenId:id,auth,context:{}});
     const desc=meta.screens.find(x=>x.id===id),expected=contract.actions[id]??[];
@@ -76,6 +76,6 @@ try{
 
   await host.persistence.putRecord('qa.phase5','sentinel',{value:'before'},{expectedVersion:0});const backup=await host.recovery.createBackup({id:'phase5-known-good'});await host.persistence.putRecord('qa.phase5','sentinel',{value:'after'},{expectedVersion:1});await host.recovery.restoreBackup(backup.id);assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');summary.checks.backupRestore=true;line('PASS','Backup/restore');
   await host.close();host=null;host=await createStandaloneHost({dataDir:root});const again=await host.backend.login({username:'qa-admin',password:credential});const restartedAuth={sessionId:again.session.id,token:again.token};await host.backend.validate(restartedAuth);assert.equal((await host.persistence.getRecord('qa.phase5','sentinel')).payload.value,'before');assert.equal((await host.persistence.health()).ok,true);summary.checks.restartPersistence=true;
-  summary.status='passed';summary.screenCount=contract.screens.length;summary.actionCount=declaredActions.length;summary.finishedAt=new Date().toISOString();await writeEvidence(summaryPath,summary);line('PASS','FASE 5',`${summary.screenCount} telas, 17/17 ações P0 funcionais`);
+  summary.status='passed';summary.screenCount=contract.screens.length;summary.actionCount=declaredActions.length;summary.finishedAt=new Date().toISOString();await writeEvidence(summaryPath,summary);line('PASS','FASE 5',`${summary.screenCount} telas P0, 17/17 ações P0 funcionais`);
 }catch(error){syncCoverage();summary.error=error.stack??error.message;summary.finishedAt=new Date().toISOString();await writeEvidence(summaryPath,summary).catch(()=>{});line('FAIL','FASE 5',error.message);process.exitCode=1;}
 finally{await host?.close?.().catch(()=>{});if(root&&process.env.ARTISYS_QA_KEEP!=='1')await rm(root,{recursive:true,force:true}).catch(()=>{});}

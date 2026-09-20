@@ -1,0 +1,71 @@
+name: P4 P5 field offline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/field-mode.js'
+      - 'src/map-package-planner.js'
+      - 'src/presentation-p5.js'
+      - 'src/index.js'
+      - 'runtime/map-package-manager.mjs'
+      - 'runtime/host.mjs'
+      - 'web/main.jsx'
+      - 'web/index.html'
+      - 'web/pwa.js'
+      - 'web/public/**'
+      - 'web/ui/field-mode.jsx'
+      - 'web/ui/field-mode.css'
+      - 'web/ui/offline-maps.jsx'
+      - 'web/ui/offline-maps.css'
+      - 'web/ui/runtime.jsx'
+      - 'web/ui/agricultural-map.jsx'
+      - 'tests/p4-p5-field-offline.test.js'
+      - 'tests/map-package-manager.test.js'
+      - 'tests/e2e/p4-field-mode.spec.mjs'
+      - 'tests/e2e/p5-offline-maps.spec.mjs'
+      - '.github/workflows/p4-p5-field-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p4-p5-field-offline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run complete unit and contract suite
+        run: npm test
+      - name: Build PWA/web product
+        run: npm run build:web
+      - name: Verify PWA assets were emitted
+        shell: bash
+        run: |
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run P4 and P5 browser journeys
+        run: npx playwright test tests/e2e/p4-field-mode.spec.mjs tests/e2e/p5-offline-maps.spec.mjs
+
+  windows-map-manager:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Run map package manager contract without external downloads
+        run: node --test tests/map-package-manager.test.js tests/p4-p5-field-offline.test.js

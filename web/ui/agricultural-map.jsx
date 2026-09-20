@@ -13,7 +13,7 @@ function projector(bounds){
 function polygonPoints(field,project){return (field.geometry?.coordinates??[]).map(([longitude,latitude])=>{const point=project(longitude,latitude);return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;}).join(' ');}
 function detailValue(value,fallback='—'){return value==null||value===''?fallback:String(value);}
 
-export function AgriculturalMapPanel({map,onAddPoint}){
+export function AgriculturalMapPanel({map,onAddPoint,onSelectField}){
   const [selected,setSelected]=useState(null);
   const [visible,setVisible]=useState(()=>Object.fromEntries(Object.keys(LAYER_LABELS).map(key=>[key,true])));
   const fields=map?.fields??[],layers=map?.layers??{};
@@ -23,7 +23,7 @@ export function AgriculturalMapPanel({map,onAddPoint}){
   const selectedMarker=selected?.type==='marker'?layerItems.find(item=>`${item.kind}:${item.id}`===selected.id):null;
   const hasSpatialData=fields.length>0||layerItems.length>0;
 
-  function selectField(field){setSelected({type:'field',id:field.fieldId});}
+  function selectField(field){setSelected({type:'field',id:field.fieldId});onSelectField?.(field);}
   function selectMarker(item){setSelected({type:'marker',id:`${item.kind}:${item.id}`});}
   return <section className="agricultural-map-panel" data-testid="agricultural-map">
     <div className="agricultural-map-heading"><div><span className="eyebrow">Mapa agrícola</span><h3>Visão espacial da lavoura</h3><p>Talhões, Safra ativa, operações e ocorrências em uma única visão local.</p></div>{onAddPoint?<button type="button" onClick={()=>onAddPoint(selectedField?.fieldId??null)}>Adicionar ponto</button>:null}</div>

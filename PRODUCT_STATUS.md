@@ -4,90 +4,91 @@
 
 - Produto: `agro-lavoura`
 - Banco: `artisys-safras-talhoes.sqlite`
-- Migrations atuais: `agro-lavoura/001-initial.sql` + `agro-lavoura/002-iot.sql`
-- Telas agrícolas contratadas: **10**
+- Migrations: `agro-lavoura/001-initial.sql` + `agro-lavoura/002-iot.sql`
+- Telas agrícolas-base contratadas: **10**
+- Telas operacionais aditivas: **Modo Campo** e **Mapas offline**
 - Superfícies virtuais adicionais: **Administração** e **Sensores e IoT**
-- Ações funcionais agrícolas contratadas: **37** (**17 P0 + 11 P1 + 9 P2**)
+- Ações agrícolas-base auditadas: **37** (**17 P0 + 11 P1 + 9 P2**)
 - Dependência obrigatória paga: **nenhuma**
-- Operação: **local-first / self-hosted**
+- Operação: **local-first / offline-first / self-hosted**
 - Targets: desktop Electron + PWA/web
-- IoT: camada opcional com consulta e configuração local no desktop, sem custo recorrente obrigatório do produto
 
 ## P0 — integridade
 
-Concluído. Cobre autenticação/RBAC, backup/restore, audit-log, validação de domínio, comando central, transação atômica/rollback, QA funcional das 17 ações originais, compatibilidade, build Windows e certificação fail-closed.
+Concluído. Cobre autenticação/RBAC, backup/restore, audit log, validação de domínio, dispatcher central, transação atômica/rollback, compatibilidade e certificação fail-closed.
 
 - Cada comando registra `attempt`, `success` ou `failure`.
-- Desktop usa uma transação SQLite por comando; PWA usa snapshot/rollback serializado.
+- Desktop usa transação SQLite por comando; PWA usa snapshot/rollback serializado.
 - Restore preserva auditoria posterior ao backup.
 - `tooling/qa-phase5.mjs` executa **17/17 ações P0**.
+- O contrato P0 preserva as 10 telas originais na mesma ordem e permite superfícies aditivas posteriores.
 
 ## P1 — arquitetura e operação
 
-Concluído. Adiciona **12 módulos** e **11 ações funcionais**:
+Concluído. Inclui EventBus durável/retry, workflow agrícola, estoque e alertas, settings persistentes, reporting/dashboard, planejamento e conflitos, ciclo de alertas, importação/exportação, busca local e domínio financeiro determinístico.
 
-- EventBus durável com retry;
-- workflow engine agrícola;
-- inventory e alerta de estoque baixo;
-- settings persistentes;
-- reporting e dashboard;
-- planning com progresso/conflitos;
-- alerts com acknowledge/snooze/dismiss;
-- importer/exporter;
-- search local accent-insensitive;
-- finance-domain determinístico.
-
-`tooling/qa-p1.mjs` exige **12/12 módulos** e **11/11 ações P1**, preservando o contrato P0.
+`tooling/qa-p1.mjs` preserva P0 e executa as **11/11 ações P1**.
 
 ## P2 — produto agrícola
 
-Concluído sobre a mesma arquitetura local-first, sem serviço externo obrigatório.
+Concluído sem serviço externo obrigatório.
 
-- Capture ligado a entidades agrícolas e controlado por feature flag.
-- Arquivos locais com validação de nome, limite padrão de 10 MiB, SHA-256, listagem/download/remoção.
-- PDF local integrado a `product-documents` / `artisys-pdf`.
-- Checklists ligados a operações, com itens obrigatórios e bloqueio opcional antes da conclusão.
-- Catálogo persistente para `crop`, `input`, `operation-type`, `unit` e `category`.
-- Feature flags locais para capture, files, PDF, checklists e catálogo.
+- captura e arquivos locais com SHA-256;
+- PDF local;
+- checklists operacionais;
+- catálogo agrícola persistente;
+- feature flags locais.
 
-`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, preservando P0/P1. O contrato agrícola agregado permanece **37 ações**.
+`tooling/qa-p2.mjs` executa as **9/9 ações P2**. O contrato agrícola-base permanece em **37 ações**.
 
-## UI Productization
+## P3 — mapa agrícola / GIS
 
-### UI-0 → UI-3
+Concluído e integrado ao produto.
 
-Concluídas:
+- visão espacial dos talhões com polígonos locais;
+- safra ativa e resumo operacional por talhão;
+- camadas de aplicações, monitoramentos, operações, fotos, chuva, sensores, máquinas, armazéns/silos e amostragem;
+- pontos agrícolas persistentes;
+- coordenadas reais ou centroide do talhão, sem inventar posição para registros não espacializados;
+- funcionamento do núcleo do mapa sem Google Maps e sem serviço pago obrigatório.
 
-- design system Lavoura;
-- shell/navegação agrupada;
-- Product Runtime por `screen.kind`;
-- dashboard especializado baseado apenas em dados reais.
+O P3 possui workflow dedicado `P3 agricultural map` com testes unitários e jornada Playwright.
 
-### UI-4 → UI-10
+## P4 — Modo Campo
 
-Implementadas com workspaces especializados para todas as áreas da navegação:
+Concluído sobre a arquitetura local-first.
 
-- UI-4: Talhões;
-- UI-5: formulários estruturados e remoção do editor JSON;
-- UI-6: dialogs/confirmations;
-- UI-7: Safras e Operações;
-- UI-8: Estoque;
-- UI-9: Financeiro;
-- UI-10: Relatórios.
+- tela dedicada **Modo Campo**;
+- observações de campo persistidas com GPS e estado de sincronização;
+- validação local de latitude/longitude;
+- medição local de distância e área, sem API de mapas;
+- visão por talhão de operações pendentes, monitoramentos e observações;
+- PWA com manifest e service worker para abrir a aplicação sem conexão;
+- o trabalho de campo continua disponível mesmo quando não existe mapa-base instalado.
 
-Também foram productizadas, para cumprir o requisito de **zero interface técnica JSON**:
+## P5 — mapas offline inteligentes por fazenda
 
-- Insumos;
-- Colheita;
-- Configurações;
-- Administração/RBAC;
-- Sensores e IoT.
+Concluído no desktop Windows x64, sem servidor próprio da ArtiSys como requisito.
 
-A camada React permanece somente de apresentação: ações agrícolas continuam passando pelo backend/dispatcher certificado; Administração usa o serviço de segurança; configuração IoT usa o provider local sob `iot:configure` e registra `attempt/success/failure` na auditoria de segurança.
+- tela dedicada **Mapas offline**;
+- bounding box calculado exclusivamente pelos polígonos dos talhões da fazenda selecionada;
+- fail-closed para fazenda sem polígono mapeado;
+- perfis `basic`, `detailed` e `maximum` com níveis de detalhe limitados;
+- extração regional PMTiles em vez de baixar o Brasil ou o estado inteiro;
+- uso de HTTP Range Requests contra uma fonte PMTiles pública compatível;
+- instalação atômica (`.part` → pacote final), verificação do PMTiles e rollback em falha;
+- preflight de espaço em disco e metadados locais do pacote;
+- PMTiles CLI obtido sob demanda no desktop e validado por SHA-256 antes de uso;
+- depois de instalado, o pacote regional permanece local e não exige internet para uso;
+- integração opcional com o catálogo de pacotes estaduais do repositório de mapas, sem torná-lo dependência para o núcleo.
 
-## UX atual
+Os pacotes estaduais completos permanecem fora do instalador principal para não inflar o executável.
 
-As 10 telas agrícolas possuem renderização especializada:
+## UI / UX
+
+Todas as áreas-base possuem renderização especializada e não dependem de editor técnico JSON. O produto usa formulários, seletores humanos e valores em unidades/reais; IDs técnicos permanecem internos sempre que o fluxo productizado permite.
+
+Navegação atual:
 
 1. Dashboard
 2. Talhões
@@ -99,43 +100,39 @@ As 10 telas agrícolas possuem renderização especializada:
 8. Financeiro
 9. Relatórios
 10. Configurações
+11. Modo Campo
+12. Mapas offline
 
-Além delas, sessões autorizadas recebem superfícies virtuais de **Administração** e **Sensores e IoT**. Não existe `ActionPanel`, `action-json` ou campo `JSON de entrada` na experiência do usuário. Os fluxos trabalham com formulários e seletores humanos; IDs técnicos e valores em centavos não são exigidos nos fluxos productizados.
+Sessões autorizadas ainda podem receber as superfícies virtuais de **Administração** e **Sensores e IoT**.
 
 ## IoT opcional
 
-A migration `002-iot.sql` e a camada `src/iot/` preservam integrações opcionais como MQTT, Modbus, LoRaWAN, CAN/J1939, ISOBUS/ISOXML, agrirouter e APIs REST de fornecedores. O núcleo do produto não depende dessas integrações para funcionar.
+A migration `002-iot.sql` e `src/iot/` mantêm MQTT, Modbus, LoRaWAN, CAN/J1939, ISOBUS/ISOXML, agrirouter e APIs REST como integrações opcionais. O produto funciona integralmente sem broker, hardware ou serviço externo.
 
-No desktop, usuários com `iot:configure` podem pela UI:
-
-- cadastrar dispositivos;
-- vincular dispositivo a talhão;
-- configurar e ativar/desativar integrações sem editor JSON;
-- criar/remover regras de limiar, dispositivo offline e bateria baixa;
-- configurar limiar, histerese, ocorrências mínimas e severidade.
-
-As regras e seus estados ficam no SQLite local. Alertas IoT entram no mesmo serviço de alertas do produto e usam o ciclo já existente de reconhecer, adiar e dispensar. Segredos de integração não são devolvidos pela API de leitura. Comandos físicos continuam fora da UI e desativados por padrão.
+Comandos físicos permanecem fora da UI e desativados por padrão.
 
 ## CI e release
 
-- workflows P0/P1/P2 usam `actions/checkout@v7` e `actions/setup-node@v7`;
-- Node de produto permanece 22;
-- `build:win` mantém `--publish never`;
-- Linux executa testes, build web, QA funcional e Playwright;
-- Windows executa certificação de release e gera instalador;
-- base legada de CI é sintética e não destrutiva;
-- não existe `package-lock.json` no baseline atual, portanto CI continua em `npm install`; migrar para `npm ci` depende primeiro de gerar e versionar um lockfile real validado.
+Workflows de produto:
+
+- `P0 hardening`
+- `P1 architecture and operation`
+- `P2 agricultural product`
+- `P3 agricultural map`
+- `P4 P5 field offline`
+
+Node de produto permanece 22. O build Windows usa `--publish never`. Linux executa testes/build/QA/Playwright e Windows executa certificação, instalador e o contrato do gerenciador PMTiles sem depender de download externo no teste.
 
 ## Banco legado real
 
-Quando existir uma base legada real a preservar, a homologação adicional permanece disponível:
+Quando existir uma base legada real a preservar:
 
 ```powershell
 $env:ARTISYS_LEGACY_DB="C:\caminho\artisys-safras-talhoes.sqlite"; npm run release:certify
 ```
 
-Essa homologação é uma etapa de migração/cutover para instalações com dados antigos; não é dependência para uma instalação nova.
+A homologação de banco legado é uma etapa de cutover para instalações existentes e não é requisito para uma instalação nova.
 
 ## Critério de fechamento
 
-P0/P1/P2, productização UI e superfícies opcionais só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo, Playwright aprovado e instalador Windows gerado.
+P0, P1, P2, P3 e P4/P5 só são considerados certificados comercialmente quando os workflows correspondentes estiverem verdes no **mesmo HEAD/PR**, incluindo testes, build web/PWA, Playwright, compatibilidade, certificação Windows e os contratos de mapas offline.

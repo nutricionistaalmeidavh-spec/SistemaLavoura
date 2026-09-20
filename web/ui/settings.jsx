@@ -5,7 +5,6 @@ import {ConfirmDialog,DataTable,Modal,PageHeader,StatusBadge,StructuredForm,date
 const backupColumns=[{key:'createdAt',label:'Criado em',render:row=>dateTime(row.createdAt)},{key:'id',label:'Backup'}];
 const catalogColumns=[{key:'name',label:'Nome'},{key:'type',label:'Tipo'},{key:'unit',label:'Unidade'},{key:'category',label:'Categoria'},{key:'active',label:'Status',render:row=><StatusBadge value={row.active===false?'inactive':'active'}/> }];
 const catalogFields=[
-  {name:'id',label:'ID',type:'text',required:true},
   {name:'type',label:'Tipo',type:'select',required:true,options:['crop','input','operation-type','unit','category']},
   {name:'name',label:'Nome',type:'text',required:true},
   {name:'unit',label:'Unidade',type:'text'},
@@ -45,7 +44,7 @@ export function LavouraSettingsWorkspace({data,onRun,screen}){
   async function restoreByCode(values){if(!hasRestoreByCode)return;setBusy(true);try{await onRun('restoreByCode',{code:values.code});setDialog(null);}finally{setBusy(false);}}
   async function previewImport(values){setBusy(true);try{const plan=await onRun('previewImport',{target:values.target,rows:parseCsvText(values.csv)});setImportPlan(plan);setDialog(null);}finally{setBusy(false);}}
   async function applyImport(){if(!importPlan?.valid)return;setBusy(true);try{await onRun('applyImport',{plan:importPlan});setImportPlan(null);}finally{setBusy(false);}}
-  async function saveCatalog(values){setBusy(true);try{await onRun('upsertCatalog',values);setDialog(null);}finally{setBusy(false);}}
+  async function saveCatalog(values){setBusy(true);try{const token=globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random().toString(16).slice(2)}`;await onRun('upsertCatalog',{...values,id:`catalog-${token}`});setDialog(null);}finally{setBusy(false);}}
   async function toggleFlag(key,value){await onRun('setFeatureFlag',{key,value:!value});}
 
   return <section className="product-workspace settings-workspace" data-testid="settings-workspace"><PageHeader eyebrow="Sistema" title="Configurações" description="Preferências locais, segurança operacional, backup e dados auxiliares." actions={<><button type="button" disabled={busy} onClick={backup}>Criar backup</button>{hasRestoreByCode?<button type="button" onClick={()=>setDialog('restore-code')}>Restaurar por código</button>:null}</>}/>
@@ -58,7 +57,7 @@ export function LavouraSettingsWorkspace({data,onRun,screen}){
     {hasRestoreByCode?<Modal open={dialog==='restore-code'} title="Restaurar por código" description="Use um código de recuperação gerado anteriormente." onClose={()=>setDialog(null)}><StructuredForm fields={contract.actions.restoreByCode.fields} busy={busy} submitLabel="Restaurar" onSubmit={restoreByCode} onCancel={()=>setDialog(null)}/></Modal>:null}
     {hasRecoveryCode?<Modal open={dialog==='recovery-result'} title="Código de recuperação" onClose={()=>setDialog(null)}><div className="recovery-code"><strong>{String(recoveryCode??'—')}</strong><p>Guarde este código em local seguro.</p></div></Modal>:null}
     <Modal open={dialog==='import'} title="Importar dados" description="Cole um CSV com cabeçalho. O sistema valida antes de gravar." onClose={()=>setDialog(null)}><StructuredForm fields={importFields} busy={busy} submitLabel="Pré-visualizar" onSubmit={previewImport} onCancel={()=>setDialog(null)}/></Modal>
-    <Modal open={dialog==='catalog'} title="Item do catálogo" onClose={()=>setDialog(null)}><StructuredForm fields={catalogFields} initialValues={{active:true}} busy={busy} onSubmit={saveCatalog} onCancel={()=>setDialog(null)}/></Modal>
+    <Modal open={dialog==='catalog'} title="Item do catálogo" description="O identificador técnico é criado automaticamente." onClose={()=>setDialog(null)}><StructuredForm fields={catalogFields} initialValues={{active:true}} busy={busy} onSubmit={saveCatalog} onCancel={()=>setDialog(null)}/></Modal>
     <ConfirmDialog open={confirmRestore} title="Restaurar backup" description={selectedBackup?`O banco local será restaurado para ${selectedBackup.row.id}.`:''} confirmLabel="Restaurar backup" onCancel={()=>setConfirmRestore(false)} onConfirm={restore}/>
   </section>;
 }

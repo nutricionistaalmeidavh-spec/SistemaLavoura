@@ -8,6 +8,7 @@ import {LavouraSeasonsWorkspace} from './seasons.jsx';
 import {LavouraOperationsWorkspace} from './operations.jsx';
 import {LavouraInventoryWorkspace} from './inventory.jsx';
 import {LavouraFinanceWorkspace} from './finance.jsx';
+import {LavouraHarvestWorkspace} from './harvest.jsx';
 import {LavouraReportsWorkspace} from './reports.jsx';
 import {LavouraSettingsWorkspace} from './settings.jsx';
 
@@ -25,7 +26,8 @@ function TableFormRouter(props){
   const id=props.screen?.id;
   if(id==='fields')return <LavouraFieldsWorkspace {...props}/>;
   if(id==='seasons')return <LavouraSeasonsWorkspace {...props}/>;
-  if(id==='inputs'||id==='harvest')return <LavouraSimpleTableFormWorkspace {...props} screenId={id}/>;
+  if(id==='inputs')return <LavouraSimpleTableFormWorkspace {...props} screenId={id}/>;
+  if(id==='harvest')return <LavouraHarvestWorkspace {...props}/>;
   return <UnknownWorkspace screen={props.screen}/>;
 }
 function UnknownWorkspace({screen}){return <section className="workspace-empty"><strong>Tela indisponível</strong><span>Não há renderer especializado para {screen?.title??screen?.id??'esta área'}.</span></section>;}

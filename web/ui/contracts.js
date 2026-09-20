@@ -35,6 +35,7 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
     createChecklist:action('createChecklist','Criar checklist',[field('title','Título'),field('items','Itens obrigatórios','lines')]),
     setChecklistItem:action('setChecklistItem','Atualizar item',[field('itemId','Item'),field('checked','Concluído','checkbox')]),
     completeChecklist:action('completeChecklist','Concluir checklist',[],{confirm:true}),
+    recordRainfall:action('recordRainfall','Registrar chuva',[field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('mm','Chuva (mm)','number',{min:0.1}),field('measuredAt','Data e hora','datetime-local'),field('notes','Observações','textarea')]),
     recordApplication:action('recordApplication','Registrar aplicação',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('areaHa','Área aplicada (ha)','number',{min:0.01}),field('products','Produtos e doses','lines',{help:'Um por linha: Insumo | 2 L/ha'}),field('target','Alvo'),field('temperatureC','Temperatura (°C)','number'),field('humidityPct','Umidade (%)','number'),field('windKmh','Vento (km/h)','number'),field('notes','Observações','textarea')]),
     addScouting:action('addScouting','Registrar monitoramento',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('kind','Tipo','select',{options:['praga','doença','erva-daninha','outro']}),field('name','Ocorrência'),field('severity','Severidade (0-5)','number',{min:0,max:5}),field('notes','Observações','textarea')])
   })}),
@@ -42,6 +43,7 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
     save:action('save','Salvar insumo',[field('name','Nome'),field('unit','Unidade','select',{options:units}),field('category','Categoria'),field('unitCost','Custo unitário (R$)','money',{min:0,step:'0.01'}),field('brand','Marca'),field('activeIngredient','Ingrediente ativo')])
   })}),
   harvest:Object.freeze({screenId:'harvest',title:'Colheita',actions:Object.freeze({
+    addStorage:action('addStorage','Registrar lote armazenado',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('warehouse','Silo/Armazém'),field('quantity','Quantidade','number',{min:0.0001}),field('unit','Unidade','select',{options:['kg','t','sc']})]),
     create:action('create','Registrar colheita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('quantity','Quantidade','number',{min:0.0001,step:'any'}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('areaHa','Área colhida (ha)','number',{min:0.0001,step:'any'}),field('harvestedAt','Data da colheita','datetime-local'),field('moisturePct','Umidade (%)','number',{min:0}),field('impurityPct','Impurezas (%)','number',{min:0}),field('lossPct','Perdas (%)','number',{min:0}),field('destination','Destino/Silo'),field('loadRef','Carga/romaneio')])
   })}),
   inventory:Object.freeze({screenId:'inventory',title:'Estoque',actions:Object.freeze({
@@ -52,6 +54,11 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
   })}),
   finance:Object.freeze({screenId:'finance',title:'Financeiro',actions:Object.freeze({
     addExpense:action('addExpense','Nova despesa',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('category','Categoria')]),
+    saveSupplier:action('saveSupplier','Novo fornecedor',[field('name','Nome'),field('document','CPF/CNPJ'),field('phone','Telefone'),field('email','E-mail')]),
+    createPurchaseOrder:action('createPurchaseOrder','Novo pedido de compra',[field('supplierId','Fornecedor'),field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('itemsText','Itens','lines',{help:'Um por linha: ID do insumo | quantidade | custo unitário em centavos'})]),
+    receivePurchaseOrder:action('receivePurchaseOrder','Receber pedido',[field('id','Pedido'),field('warehouse','Armazém')]),
+    createSale:action('createSale','Nova venda',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('buyer','Comprador'),field('quantity','Quantidade','number',{min:0.0001}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('unitPrice','Preço unitário (R$)','money',{min:0}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'})]),
+    deliverSale:action('deliverSale','Registrar entrega',[field('saleId','Venda'),field('quantity','Quantidade','number',{min:0.0001}),field('reference','Romaneio/Referência')]),
     addIncome:action('addIncome','Nova receita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('partyId','Cliente/Parte')])
   })}),
   reports:Object.freeze({screenId:'reports',title:'Relatórios',actions:Object.freeze({

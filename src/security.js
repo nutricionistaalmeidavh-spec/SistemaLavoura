@@ -21,7 +21,7 @@ export const PRESENTATION_ACCESS=Object.freeze({
       actions:{backup:'backup:write',restore:'backup:restore'}
     },
     admin:{read:'users:read',write:'users:write'},
-    iot:{read:'iot:read'}
+    iot:{read:'iot:read',write:'iot:configure'}
   })
 });
 

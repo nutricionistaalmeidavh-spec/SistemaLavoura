@@ -79,7 +79,7 @@ export async function createStandaloneHost({dataDir,backupDir=join(dataDir,'back
     }
   });
   const presentation=createAgroLavouraPresentation({persistence,recovery});
-  const iot=createSqliteIoTReadProvider({dbPath});
+  const iot=createSqliteIoTReadProvider({dbPath,persistence,alerts:presentation.services.alerts});
   const backend=createRpcBackend({presentation,iot});
   return Object.freeze({productId:PRODUCT_ID,dbPath,backupDir,persistence,recovery,presentation,iot,backend,async close(){const old=current;current=null;await old?.close?.();}});
 }

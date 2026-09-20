@@ -10,14 +10,23 @@ const PERMISSION_LABELS=Object.freeze({
   'users:read':'Consultar usuários','users:write':'Administrar usuários',
   'audit:read':'Consultar auditoria','session:revoke':'Gerenciar a própria sessão',
   'settings:read':'Consultar configurações','settings:write':'Alterar configurações',
-  'backup:write':'Criar backup','backup:restore':'Restaurar backup'
+  'backup:write':'Criar backup','backup:restore':'Restaurar backup',
+  'iot:read':'Consultar sensores e IoT','iot:manage':'Gerenciar integrações IoT','iot:configure':'Configurar sensores e alertas IoT'
 });
+const IOT_AUDIT_LABELS=Object.freeze({saveDevice:'Salvar dispositivo IoT',bindField:'Vincular sensor ao talhão',saveAdapterConfig:'Salvar integração IoT',setAdapterEnabled:'Alterar estado da integração IoT',saveRule:'Salvar regra de alerta IoT',removeRule:'Remover regra de alerta IoT'});
+const AUDIT_PHASE_LABELS=Object.freeze({attempt:'iniciado',success:'concluído',failure:'falhou'});
 const roleLabel=value=>ROLE_LABELS[value]??String(value??'—');
 const permissionLabel=value=>PERMISSION_LABELS[value]??String(value??'').replaceAll(':',' · ').replaceAll('-',' ');
-const auditAction=value=>({
-  'users.bootstrap':'Administrador inicial criado','users.create':'Usuário criado','users.roles':'Papéis alterados','users.active':'Status do usuário alterado','users.password-change':'Senha alterada',
-  'session.login:success':'Login realizado','session.login:failure':'Falha de login','session.revoke':'Sessão encerrada'
-}[value]??String(value??'—').replaceAll('.',' · ').replaceAll(':',' · '));
+const auditAction=value=>{
+  const direct={
+    'users.bootstrap':'Administrador inicial criado','users.create':'Usuário criado','users.roles':'Papéis alterados','users.active':'Status do usuário alterado','users.password-change':'Senha alterada',
+    'session.login:success':'Login realizado','session.login:failure':'Falha de login','session.revoke':'Sessão encerrada'
+  }[value];
+  if(direct)return direct;
+  const iot=/^iot\.([^:]+):(attempt|success|failure)$/.exec(String(value??''));
+  if(iot&&IOT_AUDIT_LABELS[iot[1]])return `${IOT_AUDIT_LABELS[iot[1]]} — ${AUDIT_PHASE_LABELS[iot[2]]}`;
+  return String(value??'—').replaceAll('.',' · ').replaceAll(':',' · ');
+};
 
 export function LavouraAdminWorkspace({data,onRun}){
   const users=Array.isArray(data?.users)?data.users:[];

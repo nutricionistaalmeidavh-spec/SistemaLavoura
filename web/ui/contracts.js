@@ -55,16 +55,20 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
   finance:Object.freeze({screenId:'finance',title:'Financeiro',actions:Object.freeze({
     addExpense:action('addExpense','Nova despesa',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('category','Categoria')]),
     saveSupplier:action('saveSupplier','Novo fornecedor',[field('name','Nome'),field('document','CPF/CNPJ'),field('phone','Telefone'),field('email','E-mail')]),
-    createPurchaseOrder:action('createPurchaseOrder','Novo pedido de compra',[field('supplierId','Fornecedor'),field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('itemsText','Itens','lines',{help:'Um por linha: ID do insumo | quantidade | custo unitário em centavos'})]),
-    receivePurchaseOrder:action('receivePurchaseOrder','Receber pedido',[field('id','Pedido'),field('warehouse','Armazém')]),
+    createPurchaseOrder:action('createPurchaseOrder','Novo pedido de compra',[field('supplierId','Fornecedor','select',{optionsKey:'supplierOptions'}),field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('itemsText','Itens do pedido','lines',{help:'Um por linha: Insumo | quantidade | Custo unitário (R$). Ex.: Glifosato | 10 | 25,90'})]),
+    receivePurchaseOrder:action('receivePurchaseOrder','Receber pedido',[field('id','Pedido de compra','select',{optionsKey:'purchaseOrderOptions'}),field('warehouse','Armazém')]),
     createSale:action('createSale','Nova venda',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('buyer','Comprador'),field('quantity','Quantidade','number',{min:0.0001}),field('unit','Unidade','select',{options:['kg','t','sc']}),field('unitPrice','Preço unitário (R$)','money',{min:0}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'})]),
-    deliverSale:action('deliverSale','Registrar entrega',[field('saleId','Venda'),field('quantity','Quantidade','number',{min:0.0001}),field('reference','Romaneio/Referência')]),
+    deliverSale:action('deliverSale','Registrar entrega',[field('saleId','Venda','select',{optionsKey:'saleOptions'}),field('quantity','Quantidade','number',{min:0.0001}),field('reference','Romaneio/Referência')]),
     addIncome:action('addIncome','Nova receita',[field('seasonId','Safra','select',{optionsKey:'seasonOptions'}),field('fieldId','Talhão','select',{optionsKey:'fieldOptions'}),field('amount','Valor (R$)','money',{min:0.01,step:'0.01'}),field('description','Descrição'),field('partyId','Cliente/Parte')])
   })}),
   reports:Object.freeze({screenId:'reports',title:'Relatórios',actions:Object.freeze({
     csv:action('csv','Gerar CSV',[field('type','Relatório','select',{options:['season-summary','field-operations','traceability']}),field('rows','Linhas','lines')]),
     issue:action('issue','Emitir documento',[field('type','Relatório','select',{options:['season-summary','field-operations','traceability']}),field('title','Título'),field('rows','Linhas','lines')]),
-    summary:action('summary','Resumir dados',[field('groupField','Agrupar por'),field('valueField','Campo de valor'),field('op','Operação','select',{options:['sum','count','avg']})]),
+    summary:action('summary','Resumir emissões',[
+      field('groupBy','Agrupar por','select',{options:[{value:'reportType',label:'Tipo de relatório'},{value:'formatLabel',label:'Formato'},{value:'period',label:'Período de emissão'}]}),
+      field('metric','Indicador','select',{options:[{value:'documentCount',label:'Quantidade de documentos'},{value:'sizeKb',label:'Tamanho dos arquivos'}]}),
+      field('calculation','Cálculo','select',{options:[{value:'total',label:'Total'},{value:'average',label:'Média'},{value:'count',label:'Quantidade de registros'}]})
+    ]),
     export:action('export','Exportar dados',[field('format','Formato','select',{options:['csv','json','xlsx-model']})]),
     pdf:action('pdf','Gerar PDF',[field('type','Relatório','select',{options:['season-summary','field-operations','traceability']}),field('title','Título')])
   })}),
@@ -77,8 +81,8 @@ export const SCREEN_UI_CONTRACTS=Object.freeze({
     merge:action('merge','Salvar preferências',[field('inventoryLowStockThreshold','Estoque mínimo','number',{min:0}),field('planningLookAheadDays','Dias de planejamento','number',{min:1}),field('alertsEnabled','Alertas ativos','checkbox'),field('reportingCsvDelimiter','Separador CSV')]),
     previewImport:action('previewImport','Pré-visualizar importação',[field('target','Destino','select',{options:['fields','inputs']}),field('csv','Dados CSV','textarea',{help:'Primeira linha deve conter os nomes das colunas.'})]),
     applyImport:action('applyImport','Aplicar importação',[],{confirm:true}),
-    upsertCatalog:action('upsertCatalog','Salvar item do catálogo',[field('id','ID'),field('kind','Tipo','select',{options:['crop','input','operation-type']}),field('name','Nome'),field('code','Código'),field('active','Ativo','checkbox')]),
-    setFeatureFlag:action('setFeatureFlag','Alterar recurso',[field('key','Recurso'),field('value','Ativo','checkbox')])
+    upsertCatalog:action('upsertCatalog','Salvar item do catálogo',[field('type','Tipo','select',{options:['crop','input','operation-type','unit','category']}),field('name','Nome'),field('unit','Unidade'),field('category','Categoria'),field('active','Ativo','checkbox')]),
+    setFeatureFlag:action('setFeatureFlag','Alterar recurso',[field('key','Recurso','select',{options:[{value:'capture.enabled',label:'Captura de arquivos'},{value:'files.enabled',label:'Anexos e arquivos'},{value:'pdf.enabled',label:'Relatórios em PDF'},{value:'checklists.enabled',label:'Checklists operacionais'},{value:'catalog.enabled',label:'Catálogo agrícola'},{value:'checklists.enforceBeforeOperationComplete',label:'Exigir checklist antes de concluir operação'}]}),field('value','Ativo','checkbox')])
   })})
 });
 

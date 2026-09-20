@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {getUiContract} from '../web/ui/contracts.js';
+import {buildReportSummaryRequest} from '../web/ui/report-summary.js';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
@@ -22,6 +23,19 @@ test('reports summary contract exposes only human product choices',()=>{
   assert.match(surface,/Média/);
   assert.match(surface,/Quantidade de registros/);
   assert.doesNotMatch(surface,/groupField|valueField/);
+});
+
+test('human report summary choices translate to the generic reporting contract',()=>{
+  const request=buildReportSummaryRequest([
+    {row:{type:'season-summary',title:'Resumo 1',format:'pdf',issuedAt:'2026-09-20T12:00:00.000Z',size:2048}},
+    {row:{type:'traceability',title:'Rastreabilidade',format:'csv',issuedAt:'2026-09-21T12:00:00.000Z',size:1024}}
+  ],{groupBy:'period',metric:'sizeKb',calculation:'total'},{'season-summary':{title:'Resumo da safra'},traceability:{title:'Rastreabilidade'}});
+  assert.equal(request.groupField,'period');
+  assert.equal(request.valueField,'sizeKb');
+  assert.equal(request.op,'sum');
+  assert.deepEqual(request.rows.map(row=>row.period),['09/2026','09/2026']);
+  assert.deepEqual(request.rows.map(row=>row.sizeKb),[2,1]);
+  assert.equal(request.rows[0].reportType,'Resumo da safra');
 });
 
 test('finance contract matches the human selectors and reais used by the specialized UI',()=>{

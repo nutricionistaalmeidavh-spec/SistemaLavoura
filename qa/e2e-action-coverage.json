@@ -1,0 +1,83 @@
+{
+  "overview.search": "action-matrix.spec.mjs",
+  "overview.acknowledgeAlert": "action-matrix.spec.mjs",
+  "overview.snoozeAlert": "action-matrix.spec.mjs",
+  "overview.dismissAlert": "action-matrix.spec.mjs",
+  "overview.capture": "action-matrix.spec.mjs",
+
+  "fields.save": "agricultural-journey.spec.mjs",
+  "fields.remove": "action-matrix.spec.mjs",
+  "fields.uploadFile": "action-matrix.spec.mjs",
+  "fields.removeFile": "action-matrix.spec.mjs",
+  "fields.saveGeometry": "action-matrix.spec.mjs",
+  "fields.addScouting": "action-matrix.spec.mjs",
+
+  "seasons.save": "agricultural-journey.spec.mjs",
+
+  "operations.schedule": "agricultural-journey.spec.mjs",
+  "operations.start": "agricultural-journey.spec.mjs",
+  "operations.complete": "agricultural-journey.spec.mjs",
+  "operations.cancel": "action-matrix.spec.mjs",
+  "operations.savePlan": "action-matrix.spec.mjs",
+  "operations.createChecklist": "action-matrix.spec.mjs",
+  "operations.setChecklistItem": "action-matrix.spec.mjs",
+  "operations.completeChecklist": "action-matrix.spec.mjs",
+  "operations.recordRainfall": "action-matrix.spec.mjs",
+  "operations.recordApplication": "agricultural-journey.spec.mjs",
+  "operations.addScouting": "action-matrix.spec.mjs",
+
+  "inputs.save": "agricultural-journey.spec.mjs",
+  "harvest.addStorage": "agricultural-journey.spec.mjs",
+  "harvest.create": "agricultural-journey.spec.mjs",
+
+  "inventory.receive": "inventory-journey.spec.mjs",
+  "inventory.consume": "inventory-journey.spec.mjs",
+  "inventory.physicalCount": "inventory-journey.spec.mjs",
+  "inventory.transfer": "inventory-journey.spec.mjs",
+
+  "finance.addExpense": "action-matrix.spec.mjs",
+  "finance.saveSupplier": "purchase-journey.spec.mjs",
+  "finance.createPurchaseOrder": "purchase-journey.spec.mjs",
+  "finance.receivePurchaseOrder": "purchase-journey.spec.mjs",
+  "finance.createSale": "agricultural-journey.spec.mjs",
+  "finance.deliverSale": "agricultural-journey.spec.mjs",
+  "finance.addIncome": "action-matrix.spec.mjs",
+
+  "reports.csv": "agricultural-journey.spec.mjs",
+  "reports.issue": "agricultural-journey.spec.mjs",
+  "reports.summary": "action-matrix.spec.mjs",
+  "reports.export": "action-matrix.spec.mjs",
+  "reports.pdf": "action-matrix.spec.mjs",
+
+  "settings.backup": "action-matrix.spec.mjs",
+  "settings.restore": "action-matrix.spec.mjs",
+  "settings.recoveryCode": "action-matrix.spec.mjs",
+  "settings.restoreByCode": "action-matrix.spec.mjs",
+  "settings.set": "action-matrix.spec.mjs",
+  "settings.merge": "action-matrix.spec.mjs",
+  "settings.previewImport": "action-matrix.spec.mjs",
+  "settings.applyImport": "action-matrix.spec.mjs",
+  "settings.upsertCatalog": "action-matrix.spec.mjs",
+  "settings.setFeatureFlag": "action-matrix.spec.mjs",
+
+  "field-mode.saveObservation": "action-matrix.spec.mjs",
+  "field-mode.addScouting": "action-matrix.spec.mjs",
+  "field-mode.startOperation": "action-matrix.spec.mjs",
+  "field-mode.uploadPhoto": "action-matrix.spec.mjs",
+
+  "offline-maps.refreshCatalog": "desktop-only: provider is unavailable in web/PWA and controls are not visible there",
+  "offline-maps.installFarmMap": "desktop-only: local PMTiles installation requires the desktop provider",
+  "offline-maps.removeFarmMap": "desktop-only: removal applies only to locally installed desktop packages",
+
+  "admin.createUser": "admin-journey.spec.mjs",
+  "admin.setUserRoles": "admin-journey.spec.mjs",
+  "admin.setUserActive": "admin-journey.spec.mjs",
+  "admin.changePassword": "action-matrix.spec.mjs",
+
+  "iot.saveDevice": "desktop-only: IoT configuration is hidden when no local provider is available",
+  "iot.bindField": "desktop-only: IoT configuration is hidden when no local provider is available",
+  "iot.saveAdapterConfig": "desktop-only: IoT configuration is hidden when no local provider is available",
+  "iot.setAdapterEnabled": "desktop-only: IoT configuration is hidden when no local provider is available",
+  "iot.saveRule": "desktop-only: IoT configuration is hidden when no local provider is available",
+  "iot.removeRule": "desktop-only: IoT configuration is hidden when no local provider is available"
+}

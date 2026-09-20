@@ -3,6 +3,8 @@ import React from 'react';
 const paths={
   dashboard:<><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></>,
   map:<><path d="m3 6 5-3 8 3 5-3v15l-5 3-8-3-5 3Z"/><path d="M8 3v15M16 6v15"/></>,
+  'map-import':<><path d="m3 6 5-3 8 3 5-3v15l-5 3-8-3-5 3Z"/><path d="M8 3v15M16 6v15"/><path d="M12 8v7M9 12l3 3 3-3"/></>,
+  satellite:<><path d="m7 7 10 10"/><path d="m5 9 4-4 10 10-4 4Z"/><path d="M14 6a6 6 0 0 1 4 4M16 3a9 9 0 0 1 5 5"/><path d="M5 19h7M8 16v3"/></>,
   crosshair:<><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></>,
   download:<><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></>,
   sprout:<><path d="M12 22V9"/><path d="M12 13C7 13 4 10 4 5c5 0 8 3 8 8Z"/><path d="M12 11c0-5 3-8 8-8 0 5-3 8-8 8Z"/></>,
@@ -24,7 +26,4 @@ const paths={
   logout:<><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></>,
   leaf:<><path d="M20 4C10 4 5 9 5 16c0 2 1 4 3 5 7-1 12-6 12-17Z"/><path d="M6 19c3-5 7-8 12-11"/></>
 };
-
-export function Icon({name,size=20,className=''}){
-  return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]??paths.leaf}</svg>;
-}
+export function Icon({name,size=20,className=''}){return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]??paths.leaf}</svg>;}

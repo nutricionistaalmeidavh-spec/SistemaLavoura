@@ -40,6 +40,7 @@ test('agricultural-chain uses the UI from field registration through report issu
   d=page.getByRole('dialog');
   await d.getByLabel('Iniciada em',{exact:true}).fill('2026-09-21T08:05');
   await submitDialog(d,'Iniciar operação');
+  await expect(page.getByRole('button',{name:'Concluir',exact:true})).toBeVisible();
   await captureStep(page,testInfo,'operacao-iniciada');
 
   await page.getByRole('button',{name:'Registrar aplicação',exact:true}).click();
@@ -52,7 +53,6 @@ test('agricultural-chain uses the UI from field registration through report issu
   await submitDialog(d,'Registrar aplicação');
   await captureStep(page,testInfo,'aplicacao-registrada');
 
-  await page.getByText('Operação Cadeia E2E',{exact:true}).first().click();
   await page.getByRole('button',{name:'Concluir',exact:true}).click();
   d=page.getByRole('dialog');
   await d.getByLabel('Concluída em',{exact:true}).fill('2026-09-21T10:00');

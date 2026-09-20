@@ -1,0 +1,5 @@
+export const AGRO_CONTRACT_VERSION="1.0";
+export const AGRO_EVENTS=new Set(["machine.registered","machine.hours.recorded","machine.usage.recorded","fueling.recorded","maintenance.completed","machine.cost.updated","field-operation.machine-used"]);
+export function validateAgroEvent(e){if(!e?.eventId||e.schemaVersion!==AGRO_CONTRACT_VERSION||!AGRO_EVENTS.has(e.event)||!e.source||!e.entityId||!e.occurredAt)throw new Error("Evento ArtiSys Agro v1 inválido");return e;}
+export function createAgroEvent({event,source,entityId,data={},links={},eventId=crypto.randomUUID(),occurredAt=new Date().toISOString()}){const e={schemaVersion:AGRO_CONTRACT_VERSION,eventId,event,source,entityId,occurredAt,data,links};return validateAgroEvent(e);}
+export async function sendAgroEvent({url,secret,event}){validateAgroEvent(event);const r=await fetch(new URL("/v1/events",url),{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${secret}`},body:JSON.stringify(event)});const body=await r.json();if(!r.ok)throw new Error(body.message||body.error||`HTTP ${r.status}`);return body;}

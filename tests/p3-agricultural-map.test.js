@@ -62,16 +62,21 @@ test('P3 exposes all roadmap agricultural layers without inventing coordinates',
   assert.equal(snapshot.layers.operations[0].coordinateSource,'field-centroid');
 });
 
-test('P3 UI is wired into Talhões with interactive layers and field card',()=>{
+test('P3 UI and both runtimes use the agricultural presentation decorator',()=>{
   const fields=fs.readFileSync(new URL('../web/ui/fields.jsx',import.meta.url),'utf8');
   const map=fs.readFileSync(new URL('../web/ui/agricultural-map.jsx',import.meta.url),'utf8');
-  const presentation=fs.readFileSync(new URL('../src/presentation.js',import.meta.url),'utf8');
+  const presentation=fs.readFileSync(new URL('../src/presentation-p3.js',import.meta.url),'utf8');
+  const browser=fs.readFileSync(new URL('../web/main.jsx',import.meta.url),'utf8');
+  const desktop=fs.readFileSync(new URL('../runtime/host.mjs',import.meta.url),'utf8');
   assert.match(fields,/AgriculturalMapPanel/);
   assert.match(fields,/data\.map/);
+  assert.match(fields,/saveMapPoint/);
   assert.match(map,/data-testid="agricultural-map"/);
   assert.match(map,/Camadas/);
   assert.match(map,/Safra ativa/);
   assert.match(map,/onClick/);
   assert.match(presentation,/buildAgriculturalMapSnapshot/);
   assert.match(presentation,/mapPoints/);
+  assert.match(browser,/presentation-p3\.js/);
+  assert.match(desktop,/presentation-p3\.js/);
 });

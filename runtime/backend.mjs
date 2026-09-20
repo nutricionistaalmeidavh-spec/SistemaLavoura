@@ -78,10 +78,12 @@ export function createRpcBackend({presentation,iot=null}){
     });
   }
   async function iotAction({action,input={},auth}={}){
-    await requireSession(auth,'iot:configure');
     if(!IOT_SETUP_ACTIONS.has(action))throw new Error(`Unknown IoT setup action: ${String(action)}`);
     if(typeof iot?.action!=='function')throw new Error('IoT setup requires the local desktop runtime.');
-    return iot.action(action,input);
+    const c=credentials(auth);
+    const entityId=input?.id??input?.deviceId??null;
+    const execution=await security.execute({...c,permission:'iot:configure',action:`iot.${action}`,entityType:'iot-setup',entityId,metadata:{protocol:input?.protocol??null,ruleType:input?.type??null}},()=>iot.action(action,input));
+    return execution.result;
   }
   async function describe(auth=null){
     const baseNavigation=presentation.shell.navigation.map(item=>({...item}));

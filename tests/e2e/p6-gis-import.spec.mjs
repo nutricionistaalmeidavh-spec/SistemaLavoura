@@ -18,7 +18,6 @@ test('P6 importa GeoJSON localmente, salva camada e aplica limite ao talhão',as
   await dialog.getByLabel('Área (ha)',{exact:true}).fill('15');
   await dialog.getByRole('button',{name:'Criar talhão',exact:true}).click();
   await expect(page.getByText('Talhão Importado',{exact:true}).first()).toBeVisible();
-
   await page.getByTestId('nav-gis-import').click();
   await expect(page.getByTestId('gis-import-workspace')).toBeVisible();
   const geojson={type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Limite produtor'},geometry:{type:'Polygon',coordinates:[[[-47.91,-21.22],[-47.89,-21.22],[-47.89,-21.20],[-47.91,-21.20],[-47.91,-21.22]]]}}]};
@@ -27,11 +26,9 @@ test('P6 importa GeoJSON localmente, salva camada e aplica limite ao talhão',as
   await expect(page.getByText('Feições').locator('..').getByText('1',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Salvar camada',exact:true}).click();
   await expect(page.getByText('talhao',{exact:true}).first()).toBeVisible();
-
   await page.getByText('talhao',{exact:true}).first().click();
-  await page.getByLabel('Talhão').selectOption({label:/Talhão Importado/});
+  await page.getByLabel('Talhão').selectOption({label:'GIS-01 · Talhão Importado'});
   await page.getByRole('button',{name:'Aplicar ao talhão',exact:true}).click();
-
   await page.getByTestId('nav-fields').click();
   const map=page.getByTestId('agricultural-map');
   await expect(map.locator('.field-shape polygon')).toHaveCount(1);

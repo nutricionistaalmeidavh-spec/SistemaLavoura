@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {normalizeGisFeatureCollection,createGisLayer,geometryForField} from '../src/gis-import.js';
+import {buildAgriculturalMapSnapshot} from '../src/agricultural-map.js';
 
 test('P6 normalizes GeoJSON and preserves MultiPolygon',()=>{
   const input={type:'FeatureCollection',features:[
@@ -34,4 +36,17 @@ test('P6 only applies Polygon or MultiPolygon as field boundary',()=>{
   assert.equal(boundary.geometry.type,'Polygon');
   assert.equal(boundary.sourceLayerId,'gis-1');
   assert.throws(()=>geometryForField({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[-47,-21],[-47.1,-21.1]]}},{fieldId:'field-1'}),/Polygon/i);
+});
+
+test('P6 map snapshot and renderer preserve all MultiPolygon parts',()=>{
+  const multi={fieldId:'field-1',type:'MultiPolygon',coordinates:[
+    [[[-48,-21],[-47.95,-21],[-47.95,-20.95],[-48,-20.95],[-48,-21]]],
+    [[[-47.9,-21],[-47.85,-21],[-47.85,-20.95],[-47.9,-20.95],[-47.9,-21]]]
+  ]};
+  const snapshot=buildAgriculturalMapSnapshot({fields:[{id:'field-1',name:'Talhão multipartes',areaHa:20}],geometries:[multi]});
+  assert.equal(snapshot.fields[0].geometry.type,'MultiPolygon');
+  assert.equal(snapshot.fields[0].geometry.rings.length,2);
+  const renderer=fs.readFileSync(new URL('../web/ui/agricultural-map.jsx',import.meta.url),'utf8');
+  assert.match(renderer,/geometry\?\.rings/);
+  assert.match(renderer,/\.map\(\(ring/);
 });

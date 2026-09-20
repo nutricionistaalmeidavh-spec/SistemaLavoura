@@ -1,5 +1,5 @@
 {
-  "screens": ["overview","fields","seasons","operations","inputs","harvest","inventory","finance","reports","settings","admin","iot"],
+  "screens": ["overview","fields","seasons","operations","inputs","harvest","inventory","finance","reports","settings","field-mode","offline-maps","admin","iot"],
   "actions": {
     "overview": ["search","acknowledgeAlert","snoozeAlert","dismissAlert","capture"],
     "fields": ["save","remove","uploadFile","removeFile","saveGeometry","addScouting"],
@@ -11,6 +11,8 @@
     "finance": ["addExpense","saveSupplier","createPurchaseOrder","receivePurchaseOrder","createSale","deliverSale","addIncome"],
     "reports": ["csv","issue","summary","export","pdf"],
     "settings": ["backup","restore","recoveryCode","restoreByCode","set","merge","previewImport","applyImport","upsertCatalog","setFeatureFlag"],
+    "field-mode": ["saveObservation","addScouting","startOperation","uploadPhoto"],
+    "offline-maps": ["refreshCatalog","installFarmMap","removeFarmMap"],
     "admin": ["createUser","setUserRoles","setUserActive","changePassword"],
     "iot": ["saveDevice","bindField","saveAdapterConfig","setAdapterEnabled","saveRule","removeRule"]
   },

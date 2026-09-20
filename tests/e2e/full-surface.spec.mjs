@@ -13,6 +13,7 @@ test('percorre 100% das telas publicadas ao usuário e preserva evidência visua
     await expect(nav,`navegação ${id}`).toBeVisible();
     await nav.click();
     await expect(nav).toHaveClass(/active/);
+    await expect(page.getByText('Tela indisponível',{exact:true}),`renderer ${id}`).toHaveCount(0);
     await captureStep(page,testInfo,`surface-${id}`);
   }
 });

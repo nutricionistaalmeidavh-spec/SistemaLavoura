@@ -2,7 +2,7 @@
   "screens": ["overview","fields","seasons","operations","inputs","harvest","inventory","finance","reports","settings","field-mode","offline-maps","admin","iot"],
   "actions": {
     "overview": ["search","acknowledgeAlert","snoozeAlert","dismissAlert","capture"],
-    "fields": ["save","remove","uploadFile","removeFile","saveGeometry","addScouting"],
+    "fields": ["save","remove","uploadFile","removeFile","saveGeometry","addScouting","saveMapPoint"],
     "seasons": ["save"],
     "operations": ["schedule","start","complete","cancel","savePlan","createChecklist","setChecklistItem","completeChecklist","recordRainfall","recordApplication","addScouting"],
     "inputs": ["save"],

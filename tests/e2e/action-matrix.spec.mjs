@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {captureStep,createField,createInput,createSeason,enterProduct} from './evidence-helpers.mjs';
+import {captureStep,createField,createInput,createSeason,enterProduct,submitDialog} from './evidence-helpers.mjs';
 
 const password=['Action','Matrix','2026!'].join('-');
 
@@ -33,7 +33,7 @@ test('screen action matrix keeps every published user action reachable from the 
   await dialog.locator('#field-fieldId').selectOption({label:'Fazenda Matriz > Talhão Matriz — 8 ha'});
   await dialog.getByLabel('Tipo de operação',{exact:true}).fill('Operação Matriz');
   await dialog.getByLabel('Programada para',{exact:true}).fill('2026-09-22T08:00');
-  await dialog.getByRole('button',{name:'Programar operação',exact:true}).click();
+  await submitDialog(dialog,'Programar operação');
   await expect(page.getByText('Operação Matriz',{exact:true}).first()).toBeVisible();
   await page.getByText('Operação Matriz',{exact:true}).first().click();
   await expectButtons(page,['Iniciar','Cancelar','Novo checklist']);
@@ -55,13 +55,12 @@ test('screen action matrix keeps every published user action reachable from the 
   await expectButtons(page,['Criar backup','Alterar uma','Importar CSV','Novo item']);
   await expect(page.getByRole('button',{name:'Salvar preferências',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Criar backup',exact:true}).click();
+  await expect(page.locator('.workspace-table tbody tr').first()).toBeVisible();
   const backupRow=page.locator('.workspace-table tbody tr').first();
-  if(await backupRow.count()){
-    await backupRow.click();
-    await expect(page.getByRole('button',{name:'Restaurar este backup',exact:true})).toBeVisible();
-    const recovery=page.getByRole('button',{name:'Gerar código',exact:true});
-    if(await recovery.count())await expect(recovery).toBeVisible();
-  }
+  await backupRow.click();
+  await expect(page.getByRole('button',{name:'Restaurar este backup',exact:true})).toBeVisible();
+  const recovery=page.getByRole('button',{name:'Gerar código',exact:true});
+  if(await recovery.count())await expect(recovery).toBeVisible();
   await captureStep(page,testInfo,'matrix-settings-actions');
 
   await page.getByTestId('nav-overview').click();

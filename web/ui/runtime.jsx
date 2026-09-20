@@ -14,6 +14,8 @@ import {LavouraSettingsWorkspace} from './settings.jsx';
 import {LavouraAdminWorkspace} from './admin.jsx';
 import {LavouraFieldMode} from './field-mode.jsx';
 import {LavouraOfflineMaps} from './offline-maps.jsx';
+import {LavouraGisImport} from './gis-import.jsx';
+import {LavouraSatellite} from './satellite.jsx';
 import {IoTWorkspace} from '../iot/IoTWorkspace.jsx';
 
 function Auth({backend,onAuth}){
@@ -47,7 +49,9 @@ const specializedScreens={
   admin:LavouraAdminWorkspace,
   iot:IoTWorkspace,
   'field-mode':LavouraFieldMode,
-  'offline-maps':LavouraOfflineMaps
+  'offline-maps':LavouraOfflineMaps,
+  'gis-import':LavouraGisImport,
+  satellite:LavouraSatellite
 };
 
 export function LavouraProductRuntime({backend}){

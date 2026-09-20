@@ -6,7 +6,7 @@
 - Banco: `artisys-safras-talhoes.sqlite`
 - Migrations: `agro-lavoura/001-initial.sql` + `agro-lavoura/002-iot.sql`
 - Telas agrícolas-base contratadas: **10**
-- Telas operacionais aditivas: **Modo Campo** e **Mapas offline**
+- Telas operacionais aditivas: **Modo Campo**, **Mapas offline**, **Importação GIS** e **Satélite**
 - Superfícies virtuais adicionais: **Administração** e **Sensores e IoT**
 - Ações agrícolas-base auditadas: **37** (**17 P0 + 11 P1 + 9 P2**)
 - Dependência obrigatória paga: **nenhuma**
@@ -84,11 +84,41 @@ Concluído no desktop Windows x64, sem servidor próprio da ArtiSys como requisi
 
 Os pacotes estaduais completos permanecem fora do instalador principal para não inflar o executável.
 
+## P6 — importação GIS
+
+Concluído no produto e coberto por gate dedicado.
+
+- tela **Importação GIS**;
+- GeoJSON, KML, KMZ, GPX, Shapefile ZIP e ISOXML/TaskData;
+- parsing local, sem upload externo;
+- normalização GeoJSON/WGS84 e validação fail-closed de coordenadas;
+- persistência em `crop.gis-layers`;
+- aplicação explícita de `Polygon`/`MultiPolygon` como limite de talhão;
+- remoção da camada não remove limite já aplicado;
+- `MultiPolygon` é preservado no read-model e renderer;
+- camadas GIS genéricas permanecem visíveis como overlay independente no mapa agrícola.
+
+## P7 — satélite opcional
+
+Concluído como capacidade opcional, sem dependência operacional do núcleo.
+
+- tela **Satélite**;
+- pesquisa STAC para Sentinel-2/Copernicus e Landsat/USGS;
+- seleção espacial baseada no polígono real do talhão;
+- modos **Vetorial**, **Imagem** e **NDVI**;
+- cache local em `crop.satellite-cache`;
+- preview local limitado a 8 MiB;
+- processamento de bandas GeoTIFF no dispositivo;
+- NDVI limitado a `[-1,1]`, com tratamento de denominador zero/NaN;
+- cache continua utilizável sem internet;
+- credenciais externas não são persistidas pelo produto;
+- nenhuma chave compartilhada ArtiSys ou assinatura obrigatória.
+
 ## UI / UX
 
 Todas as áreas-base possuem renderização especializada e não dependem de editor técnico JSON. O produto usa formulários, seletores humanos e valores em unidades/reais; IDs técnicos permanecem internos sempre que o fluxo productizado permite.
 
-Navegação atual:
+Navegação agrícola aditiva atual:
 
 1. Dashboard
 2. Talhões
@@ -102,6 +132,8 @@ Navegação atual:
 10. Configurações
 11. Modo Campo
 12. Mapas offline
+13. Importação GIS
+14. Satélite
 
 Sessões autorizadas ainda podem receber as superfícies virtuais de **Administração** e **Sensores e IoT**.
 
@@ -120,8 +152,10 @@ Workflows de produto:
 - `P2 agricultural product`
 - `P3 agricultural map`
 - `P4 P5 field offline`
+- `P6 GIS import`
+- `P7 satellite`
 
-Node de produto permanece 22. O build Windows usa `--publish never`. Linux executa testes/build/QA/Playwright e Windows executa certificação, instalador e o contrato do gerenciador PMTiles sem depender de download externo no teste.
+Node de produto permanece 22. O build Windows usa `--publish never`. Os gates P6/P7 executam suíte completa, build web e jornadas Playwright próprias; P0–P5 continuam responsáveis pelos regressivos e certificação/instalador existentes.
 
 ## Banco legado real
 
@@ -135,4 +169,4 @@ A homologação de banco legado é uma etapa de cutover para instalações exist
 
 ## Critério de fechamento
 
-P0, P1, P2, P3 e P4/P5 só são considerados certificados comercialmente quando os workflows correspondentes estiverem verdes no **mesmo HEAD/PR**, incluindo testes, build web/PWA, Playwright, compatibilidade, certificação Windows e os contratos de mapas offline.
+P0, P1, P2, P3, P4/P5, P6 e P7 só são considerados certificados comercialmente quando os workflows correspondentes estiverem verdes no **mesmo HEAD/PR**, incluindo testes, build web/PWA, Playwright, compatibilidade, certificação Windows e contratos específicos de mapas/GIS/satélite.

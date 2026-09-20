@@ -8,7 +8,7 @@
     "phase5":"npm run check && npm run qa:surface && npm run qa:web","p1":"npm run phase5 && npm run qa:p1 && npm run compat:contract","p2":"npm run p1 && npm run qa:p2","phase6":"npm run compat:contract && npm run build:win","phase7":"node tooling/phase7-cutover.mjs","phase8:certify":"node tooling/certify-release.mjs",
     "cutover:verify":"npm run phase5 && npm run compat:legacy && npm run build:win","build:win":"npm run build:web && electron-builder --win nsis --x64 --publish never","release:win":"npm run phase5 && npm run phase6","release:certify":"npm run phase5 && npm run phase7 && npm run qa:web && npm run check && npm run build:win && npm run phase8:certify"
   },
-  "dependencies":{"react":"^19.1.1","react-dom":"^19.1.1"},
+  "dependencies":{"@tmcw/togeojson":"^7.1.2","@xmldom/xmldom":"^0.8.11","fflate":"^0.8.3","geotiff":"^3.0.5","isoxml":"^1.11.2","react":"^19.1.1","react-dom":"^19.1.1","shpjs":"^6.2.0"},
   "devDependencies":{"@playwright/test":"^1.55.0","electron":"^44.3.0","electron-builder":"^26.0.12","vite":"^7.3.6"},
   "build":{"appId":"dev.artisys.lavoura","productName":"ArtiSys Lavoura","directories":{"output":"release"},"files":["dist/**/*","electron/**/*","runtime/**/*","src/**/*","shared/**/*","migrations/**/*","seeds/**/*","branding/**/*","persistence/**/*","package.json"],"win":{"target":["nsis"],"artifactName":"ArtiSys-Lavoura-Setup-${version}.${ext}"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}
 }

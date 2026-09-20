@@ -76,11 +76,13 @@ test('P3 exposes all roadmap agricultural layers without inventing coordinates',
   assert.equal(orphan.unmappedFields.length,1);
 });
 
-test('P3 UI remains wired when P5 decorates the P3 presentation',()=>{
+test('P3 UI remains wired through additive P5, P6 and P7 presentation decorators',()=>{
   const fields=fs.readFileSync(new URL('../web/ui/fields.jsx',import.meta.url),'utf8');
   const map=fs.readFileSync(new URL('../web/ui/agricultural-map.jsx',import.meta.url),'utf8');
   const presentation=fs.readFileSync(new URL('../src/presentation-p3.js',import.meta.url),'utf8');
   const presentationP5=fs.readFileSync(new URL('../src/presentation-p5.js',import.meta.url),'utf8');
+  const presentationP6=fs.readFileSync(new URL('../src/presentation-p6.js',import.meta.url),'utf8');
+  const presentationP7=fs.readFileSync(new URL('../src/presentation-p7.js',import.meta.url),'utf8');
   const browser=fs.readFileSync(new URL('../web/main.jsx',import.meta.url),'utf8');
   const desktop=fs.readFileSync(new URL('../runtime/host.mjs',import.meta.url),'utf8');
   assert.match(fields,/AgriculturalMapPanel/);
@@ -93,8 +95,10 @@ test('P3 UI remains wired when P5 decorates the P3 presentation',()=>{
   assert.match(presentation,/buildAgriculturalMapSnapshot/);
   assert.match(presentation,/mapPoints/);
   assert.match(presentationP5,/presentation-p3\.js/);
-  assert.match(browser,/presentation-p5\.js/);
-  assert.match(desktop,/presentation-p5\.js/);
+  assert.match(presentationP6,/presentation-p5\.js/);
+  assert.match(presentationP7,/presentation-p6\.js/);
+  assert.match(browser,/presentation-p7\.js/);
+  assert.match(desktop,/presentation-p7\.js/);
 });
 
 test('CI serializes browser certification to avoid Windows socket exhaustion',()=>{

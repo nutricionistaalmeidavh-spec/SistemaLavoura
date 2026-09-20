@@ -2,7 +2,7 @@ import {mkdir,readdir,copyFile,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {loadSqlMigrations,openProductPersistence} from '../shared/packages/vertical-persistence/src/index.js';
-import {createAgroLavouraPresentation} from '../src/presentation.js';
+import {createAgroLavouraPresentation} from '../src/presentation-p3.js';
 import {createRpcBackend} from './backend.mjs';
 import {createSqliteIoTReadProvider} from './iot-provider.mjs';
 

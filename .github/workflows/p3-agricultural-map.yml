@@ -1,0 +1,46 @@
+name: P3 agricultural map
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/agricultural-map.js'
+      - 'src/presentation-p3.js'
+      - 'src/commercial-p0.js'
+      - 'src/index.js'
+      - 'web/main.jsx'
+      - 'web/ui/fields.jsx'
+      - 'web/ui/agricultural-map.jsx'
+      - 'web/ui/agricultural-map.css'
+      - 'runtime/host.mjs'
+      - 'tests/p3-agricultural-map.test.js'
+      - 'tests/e2e/p3-agricultural-map.spec.mjs'
+      - '.github/workflows/p3-agricultural-map.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-agricultural-map-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run full unit and contract suite
+        run: npm test
+      - name: Build web product
+        run: npm run build:web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run P3 field journey
+        run: npx playwright test tests/e2e/p3-agricultural-map.spec.mjs

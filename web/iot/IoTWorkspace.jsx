@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useState} from 'react';
 import {buildIoTOverviewModel,buildDeviceRows,buildIntegrationRows} from './model.js';
 import './iot.css';
 
@@ -16,6 +16,7 @@ function SetupForm({title,onSubmit,children,submitLabel='Salvar'}){
 
 export function IoTWorkspace({data=null,devices=[],telemetry=[],alerts=[],integrations=[],onRun}){
   const snapshot=data??{available:true,devices,telemetry,alerts,integrations};
+  const [ruleType,setRuleType]=useState('threshold');
   if(snapshot.available===false)return <section className="iot-workspace" aria-labelledby="iot-title">
     <header className="iot-heading"><div><p>Integrações opcionais</p><h2 id="iot-title">IoT da lavoura</h2></div><span className="iot-readonly">Sem dependência obrigatória</span></header>
     <article className="iot-panel iot-empty-state"><h3>Telemetria local ainda não conectada neste ambiente</h3><p>O Sistema Lavoura funciona normalmente sem IoT. Para consultar sensores, dispositivos e integrações locais, use o aplicativo desktop e configure um adapter compatível. Nenhum serviço pago é necessário pelo sistema.</p></article>
@@ -29,9 +30,8 @@ export function IoTWorkspace({data=null,devices=[],telemetry=[],alerts=[],integr
   const overview=buildIoTOverviewModel({devices:currentDevices,telemetry:currentTelemetry,alerts:currentAlerts});
   const deviceRows=buildDeviceRows(currentDevices);
   const integrationRows=buildIntegrationRows(currentIntegrations);
-  const deviceOptions=useMemo(()=>currentDevices.map(item=>({value:item.id,label:item.name})),[currentDevices]);
+  const deviceOptions=currentDevices.map(item=>({value:item.id,label:item.name}));
   const fieldOptions=snapshot.fieldOptions??[];
-  const [ruleType,setRuleType]=useState('threshold');
 
   return <section className="iot-workspace" aria-labelledby="iot-title">
     <header className="iot-heading">

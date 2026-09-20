@@ -25,3 +25,11 @@ export function buildReportSummaryRequest(issuedRows=[],values={},definitions={}
   });
   return Object.freeze({rows:Object.freeze(rows),groupField,valueField,op});
 }
+
+export function formatReportSummaryValue(value,values={}){
+  const numeric=Number(value);
+  if(!Number.isFinite(numeric))return '—';
+  const formatted=numeric.toLocaleString('pt-BR',{maximumFractionDigits:2});
+  if(values.metric==='sizeKb'&&values.calculation!=='count')return `${formatted} KB`;
+  return formatted;
+}

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAgriculturalMapPoint,buildAgriculturalMapSnapshot} from '../src/agricultural-map.js';
+import {createApplicationRecord,createScoutingRecord} from '../src/commercial-p0.js';
 import fs from 'node:fs';
 
 const geometry={fieldId:'f1',type:'Polygon',coordinates:[[-47.91,-21.22],[-47.89,-21.22],[-47.89,-21.20],[-47.91,-21.20]]};
@@ -33,6 +34,16 @@ test('P3 validates persistent agricultural map points',()=>{
   assert.throws(()=>createAgriculturalMapPoint({kind:'sensor',name:'X',latitude:95,longitude:0}),/latitude/i);
 });
 
+test('P3 agricultural events preserve valid explicit coordinates',()=>{
+  const application=createApplicationRecord({id:'app',seasonId:'s1',fieldId:'f1',areaHa:10,appliedAt:'2026-09-20T10:00:00Z',latitude:-21.21,longitude:-47.9,products:[{inputId:'i1',name:'Produto',unit:'L',dosePerHa:1}]});
+  const scouting=createScoutingRecord({id:'sc',seasonId:'s1',fieldId:'f1',kind:'praga',name:'Percevejo',latitude:-21.205,longitude:-47.895});
+  assert.equal(application.latitude,-21.21);
+  assert.equal(application.longitude,-47.9);
+  assert.equal(scouting.latitude,-21.205);
+  assert.equal(scouting.longitude,-47.895);
+  assert.throws(()=>createApplicationRecord({seasonId:'s1',fieldId:'f1',areaHa:10,latitude:91,longitude:0,products:[{inputId:'i1',dosePerHa:1}]}),/Latitude/);
+});
+
 test('P3 builds colored field polygons with active season and click-card data',()=>{
   const snapshot=buildAgriculturalMapSnapshot({...fixture(),now:'2026-09-20T12:00:00.000Z'});
   assert.equal(snapshot.fields.length,1);
@@ -60,6 +71,9 @@ test('P3 exposes all roadmap agricultural layers without inventing coordinates',
   assert.equal(snapshot.layers.photos[0].coordinateSource,'field-centroid');
   assert.equal(snapshot.layers.rainfall[0].coordinateSource,'field-centroid');
   assert.equal(snapshot.layers.operations[0].coordinateSource,'field-centroid');
+  const orphan=buildAgriculturalMapSnapshot({fields:[{id:'without-geometry',name:'Sem mapa'}],applications:[{id:'a',fieldId:'without-geometry',name:'Sem coordenada'}]});
+  assert.equal(orphan.layers.applications.length,0);
+  assert.equal(orphan.unmappedFields.length,1);
 });
 
 test('P3 UI and both runtimes use the agricultural presentation decorator',()=>{

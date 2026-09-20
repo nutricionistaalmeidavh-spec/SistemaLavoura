@@ -34,8 +34,9 @@ test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({pa
   await expect(page.getByTestId('satellite-workspace')).toBeVisible();
   await page.getByLabel('Talhão').selectOption({label:'SAT-01 · Talhão Satélite'});
   await page.getByRole('button',{name:'Buscar imagens',exact:true}).click();
-  await expect(page.getByText('Sentinel-2 · Copernicus').last()).toBeVisible();
-  await expect(page.getByText('Nuvens: 4%')).toBeVisible();
+  const scenes=page.locator('.satellite-scenes');
+  await expect(scenes.getByText('Sentinel-2 · Copernicus',{exact:true})).toBeVisible();
+  await expect(scenes.getByText('Nuvens: 4%',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Salvar offline',exact:true}).click();
   await expect(page.getByText('S2-TEST',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Imagem',exact:true}).click();

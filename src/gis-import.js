@@ -9,44 +9,21 @@ function validatePosition(position,path='coordinate'){
   const longitude=Number(position[0]),latitude=Number(position[1]);
   if(!Number.isFinite(longitude)||longitude<-180||longitude>180)throw new TypeError(`${path} longitude is outside WGS84.`);
   if(!Number.isFinite(latitude)||latitude<-90||latitude>90)throw new TypeError(`${path} latitude is outside WGS84.`);
-  return Object.freeze(position.length>2?[longitude,latitude,...position.slice(2).map(Number)]:[longitude,latitude]);
+  const altitude=position.slice(2).map(Number);
+  if(altitude.some(value=>!Number.isFinite(value)))throw new TypeError(`${path} contains an invalid extra coordinate.`);
+  return Object.freeze(position.length>2?[longitude,latitude,...altitude]:[longitude,latitude]);
 }
-
-function mapCoordinates(value,depth,path){
-  if(depth===0)return validatePosition(value,path);
-  if(!Array.isArray(value)||value.length===0)throw new TypeError(`${path} coordinates are empty or invalid.`);
-  return Object.freeze(value.map((item,index)=>mapCoordinates(item,depth-1,`${path}[${index}]`)));
-}
-
-function coordinateDepth(type){
-  switch(type){
-    case'Point':return 0;
-    case'MultiPoint':case'LineString':return 1;
-    case'MultiLineString':case'Polygon':return 2;
-    case'MultiPolygon':return 3;
-    default:return null;
-  }
-}
-
+function mapCoordinates(value,depth,path){if(depth===0)return validatePosition(value,path);if(!Array.isArray(value)||value.length===0)throw new TypeError(`${path} coordinates are empty or invalid.`);return Object.freeze(value.map((item,index)=>mapCoordinates(item,depth-1,`${path}[${index}]`)));}
+function coordinateDepth(type){switch(type){case'Point':return 0;case'MultiPoint':case'LineString':return 1;case'MultiLineString':case'Polygon':return 2;case'MultiPolygon':return 3;default:return null;}}
 function samePosition(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length>=2&&b.length>=2&&a[0]===b[0]&&a[1]===b[1];}
-function validateRing(ring,path){
-  if(!Array.isArray(ring)||ring.length<4)throw new TypeError(`${path} Polygon ring requires at least four positions.`);
-  if(!samePosition(ring[0],ring.at(-1)))throw new TypeError(`${path} Polygon ring must be closed.`);
-}
-function validatePolygonStructure(type,coordinates,path){
-  const polygons=type==='Polygon'?[coordinates]:coordinates;
-  for(const [polygonIndex,polygon] of polygons.entries()){
-    if(!Array.isArray(polygon)||polygon.length===0)throw new TypeError(`${path} Polygon is empty.`);
-    for(const [ringIndex,ring] of polygon.entries())validateRing(ring,`${path}[${polygonIndex}][${ringIndex}]`);
-  }
-}
+function validateRing(ring,path){if(!Array.isArray(ring)||ring.length<4)throw new TypeError(`${path} Polygon ring requires at least four positions.`);if(!samePosition(ring[0],ring.at(-1)))throw new TypeError(`${path} Polygon ring must be closed.`);}
+function validatePolygonStructure(type,coordinates,path){const polygons=type==='Polygon'?[coordinates]:coordinates;for(const[polygonIndex,polygon]of polygons.entries()){if(!Array.isArray(polygon)||polygon.length===0)throw new TypeError(`${path} Polygon is empty.`);for(const[ringIndex,ring]of polygon.entries())validateRing(ring,`${path}[${polygonIndex}][${ringIndex}]`);}}
 
 export function normalizeGisGeometry(geometry,path='geometry'){
   if(!geometry||typeof geometry!=='object')throw new TypeError(`${path} is required.`);
   const type=String(geometry.type??'');
   if(!ALLOWED_GEOMETRIES.has(type))throw new TypeError(`${path} type ${type||'(empty)'} is unsupported.`);
-  const depth=coordinateDepth(type);
-  const coordinates=mapCoordinates(geometry.coordinates,depth,`${path}.coordinates`);
+  const coordinates=mapCoordinates(geometry.coordinates,coordinateDepth(type),`${path}.coordinates`);
   if(type==='Polygon'||type==='MultiPolygon')validatePolygonStructure(type,coordinates,`${path}.coordinates`);
   return Object.freeze({type,coordinates});
 }
@@ -59,12 +36,7 @@ export function normalizeGisFeatureCollection(input={}){
     if(feature?.type!=='Feature')throw new TypeError(`Feature ${index+1} is invalid.`);
     const geometry=normalizeGisGeometry(feature.geometry,`features[${index}].geometry`);
     geometryTypes[geometry.type]=(geometryTypes[geometry.type]??0)+1;
-    return Object.freeze({
-      type:'Feature',
-      ...(feature.id==null?{}:{id:String(feature.id)}),
-      properties:Object.freeze({...((feature.properties&&typeof feature.properties==='object')?clone(feature.properties):{})}),
-      geometry
-    });
+    return Object.freeze({type:'Feature',...(feature.id==null?{}:{id:String(feature.id)}),properties:Object.freeze({...((feature.properties&&typeof feature.properties==='object')?clone(feature.properties):{})}),geometry});
   });
   return Object.freeze({type:'FeatureCollection',features:Object.freeze(features),summary:Object.freeze({featureCount:features.length,geometryTypes:Object.freeze(geometryTypes)})});
 }
@@ -73,17 +45,7 @@ export function createGisLayer(input={}){
   const featureCollection=normalizeGisFeatureCollection(input.featureCollection);
   const importedAt=new Date(input.importedAt??Date.now());
   if(Number.isNaN(importedAt.getTime()))throw new TypeError('GIS importedAt is invalid.');
-  return Object.freeze({
-    id:idFor('gis-layer',input.id),
-    name:text(input.name,'GIS layer name'),
-    format:text(input.format,'GIS source format').toLowerCase(),
-    sourceFile:optional(input.sourceFile),
-    featureCollection,
-    summary:featureCollection.summary,
-    warnings:Object.freeze(Array.isArray(input.warnings)?input.warnings.map(String):[]),
-    importedAt:importedAt.toISOString(),
-    metadata:Object.freeze({...((input.metadata&&typeof input.metadata==='object')?clone(input.metadata):{})})
-  });
+  return Object.freeze({id:idFor('gis-layer',input.id),name:text(input.name,'GIS layer name'),format:text(input.format,'GIS source format').toLowerCase(),sourceFile:optional(input.sourceFile),featureCollection,summary:featureCollection.summary,warnings:Object.freeze(Array.isArray(input.warnings)?input.warnings.map(String):[]),importedAt:importedAt.toISOString(),metadata:Object.freeze({...((input.metadata&&typeof input.metadata==='object')?clone(input.metadata):{})})});
 }
 
 export function geometryForField(feature,{fieldId,sourceLayerId=null,featureIndex=null,updatedAt=null}={}){
@@ -92,14 +54,7 @@ export function geometryForField(feature,{fieldId,sourceLayerId=null,featureInde
   if(!['Polygon','MultiPolygon'].includes(geometry.type))throw new TypeError('Field boundary must be a Polygon or MultiPolygon.');
   const date=new Date(updatedAt??Date.now());
   if(Number.isNaN(date.getTime()))throw new TypeError('Field geometry updatedAt is invalid.');
-  return Object.freeze({
-    id:text(fieldId,'Field id'),
-    fieldId:text(fieldId,'Field id'),
-    geometry,
-    sourceLayerId:optional(sourceLayerId),
-    sourceFeatureIndex:featureIndex==null?null:Number(featureIndex),
-    updatedAt:date.toISOString()
-  });
+  const id=text(fieldId,'Field id');
+  return Object.freeze({id,fieldId:id,type:geometry.type,coordinates:geometry.coordinates,geometry,sourceLayerId:optional(sourceLayerId),sourceFeatureIndex:featureIndex==null?null:Number(featureIndex),updatedAt:date.toISOString()});
 }
-
 export const GIS_GEOMETRY_TYPES=Object.freeze([...ALLOWED_GEOMETRIES]);

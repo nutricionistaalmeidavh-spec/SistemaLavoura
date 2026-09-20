@@ -30,9 +30,16 @@ test('P6 parses GeoJSON, KML, GPX and KMZ locally into normalized GeoJSON',async
 test('P6 dispatches ZIP Shapefile and TaskData to their lawful local parsers',async()=>{
   const fakeZip=Uint8Array.from([80,75,3,4]);
   let shapeCalls=0,isoCalls=0;
-  const shape=await parseGisFile({name:'shape.zip',bytes:fakeZip},{inspectZip:()=>['FIELD.SHP','FIELD.DBF'],parseShapefile:async()=>({type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Shape'},geometry:{type:'Point',coordinates:[-47,-21]}}]}),parseIsoxml:async()=>{isoCalls++;throw new Error('wrong parser');}});
-  shapeCalls++;
+  const shape=await parseGisFile({name:'shape.zip',bytes:fakeZip},{inspectZip:()=>['FIELD.SHP','FIELD.DBF'],parseShapefile:async()=>{shapeCalls++;return({type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Shape'},geometry:{type:'Point',coordinates:[-47,-21]}}]});},parseIsoxml:async()=>{isoCalls++;throw new Error('wrong parser');}});
   assert.equal(shapeCalls,1);assert.equal(isoCalls,0);assert.equal(shape.format,'shapefile');
   const iso=await parseGisFile({name:'task.zip',bytes:fakeZip},{inspectZip:()=>['TASKDATA.XML'],parseIsoxml:async()=>({type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Partfield'},geometry:{type:'Polygon',coordinates:[[[-47,-21],[-46.9,-21],[-46.9,-20.9],[-47,-20.9],[-47,-21]]]}}]})});
   assert.equal(iso.format,'isoxml');
+});
+
+test('P6 imports a raw SHP as geometry-only WGS84 with an explicit warning',async()=>{
+  const result=await parseGisFile({name:'limite.shp',bytes:Uint8Array.from([1,2,3,4])},{parseRawShapefile:async()=>[{type:'Polygon',coordinates:[[[-47,-21],[-46.9,-21],[-46.9,-20.9],[-47,-20.9],[-47,-21]]]}]});
+  assert.equal(result.format,'shapefile');
+  assert.equal(result.featureCollection.features[0].geometry.type,'Polygon');
+  assert.match(result.warnings.join(' '),/WGS84/i);
+  assert.match(result.warnings.join(' '),/atribut/i);
 });

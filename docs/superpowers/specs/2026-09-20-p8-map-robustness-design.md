@@ -14,9 +14,9 @@ P8 is complete when the product can demonstrate all of the following:
 2. Startup/snapshot reconciliation can recover a valid backup after an interrupted replacement and can remove stale temporary files safely.
 3. Disk-space failures are detected before installation when possible and are translated into stable, actionable errors if the operating system reports `ENOSPC` during work.
 4. A newly generated PMTiles file is verified before promotion and receives locally stored integrity metadata.
-5. An installed package can be explicitly verified later and reported as healthy, missing, corrupt, or outdated without deleting the user's last known-good package automatically.
+5. An installed package can be explicitly checked later and reported as healthy, unverified, missing, corrupt, or outdated without deleting the user's last known-good package automatically.
 6. Catalog refresh validates the complete existing manifest contract instead of accepting only `schemaVersion` plus `maps`.
-7. A farm whose bounds cross more than one state is accepted only when the available catalog coverage covers the complete farm bounds; partial coverage fails closed with a clear reason.
+7. A farm whose bounds cross more than one state is accepted only when the available catalog-bound coverage covers the complete farm bounds; partial coverage fails closed with a clear reason.
 8. Invalid WGS84 coordinates, degenerate polygon rings, and self-intersecting field boundaries are rejected at GIS normalization boundaries.
 9. Corrupt legacy field geometry cannot crash the whole agricultural map; invalid fields are surfaced as unmapped/invalid while valid fields continue rendering.
 10. Building the agricultural map snapshot scales approximately linearly with field-related records rather than repeatedly scanning every collection for every field.
@@ -153,12 +153,17 @@ Package metadata schema gains a versioned local integrity block:
 
 `snapshot()` performs cheap reconciliation based on metadata/file existence and size. It does not hash multi-gigabyte files on every screen load.
 
-A new `verifyFarmMap({id})` action performs an explicit PMTiles verification plus SHA-256 verification and returns package health:
+A new `verifyFarmMap({id})` action returns package health:
 
 - `healthy`
+- `unverified`
 - `missing`
 - `corrupt`
 - `outdated`
+
+For metadata version 1 packages, verification checks current file size and SHA-256 against the values captured after the successful structural `pmtiles verify` performed during installation. If the PMTiles CLI is already present locally, the explicit verification may also run structural `pmtiles verify`; it must not download the CLI or require network solely to validate an already installed package.
+
+For legacy metadata without SHA-256, explicit verification computes local integrity metadata when a local PMTiles CLI is already available. If no local CLI exists, the package remains `unverified` and usable; P8 does not force a network download merely to upgrade metadata.
 
 `outdated` means the package remains usable but the cached/published catalog has a newer relevant source/catalog version. P8 does not auto-delete or auto-update an outdated package.
 
@@ -171,6 +176,7 @@ If the network is unavailable:
 - a valid cached catalog remains usable for planning/status;
 - a direct regional extraction that needs network fails with `MAP_SOURCE_UNAVAILABLE`;
 - already installed packages remain usable;
+- explicit verification of a version-1 package remains local;
 - field mode and local agricultural data remain usable.
 
 The product never treats a malformed downloaded manifest as valid merely because it is JSON.
@@ -188,9 +194,11 @@ If filesystem capacity cannot be measured, the operation may proceed, but runtim
 
 ### 6. Multi-State Coverage
 
-`buildFarmMapDownloadPlan()` continues selecting all intersecting available state packages, but P8 adds a complete-coverage check.
+`buildFarmMapDownloadPlan()` continues selecting all intersecting available state packages, but P8 adds a complete-coverage check using the geographic `bounds` declared by the published map catalog.
 
-A plan is valid only if the union of available non-national package bounds covers the complete farm bounding rectangle. This prevents a farm that crosses an unavailable state from being accepted because another intersecting state happened to be available.
+A plan is valid only if the union of available non-national package rectangles covers the complete farm bounding rectangle. This prevents a farm that crosses an unavailable catalog region from being accepted because another intersecting state happened to be available.
+
+This is a package-coverage check, not cadastral validation of exact Brazilian state borders. Exact jurisdiction boundaries are outside P8 because the current distribution contract publishes rectangular bounds, not authoritative state polygons.
 
 The output remains one farm-region PMTiles extraction. State packages are catalog/coverage inputs, not separately exposed farm files.
 
@@ -249,6 +257,7 @@ A stress regression test will build a snapshot with thousands of fields and rela
 `web/ui/offline-maps.jsx` displays package health and actionable states:
 
 - verified/healthy;
+- unverified legacy package;
 - update available;
 - package missing;
 - integrity problem.
@@ -281,7 +290,7 @@ Tests use injected filesystem/network/CLI behavior where practical; the Windows 
 
 Existing package metadata without `metadataVersion`/`sha256` remains readable.
 
-Such packages are reported as `unverified` until explicitly verified. Successful explicit verification upgrades metadata in place to version 1. P8 must not require users to redownload a valid pre-P8 package solely because metadata is older.
+Such packages are reported as `unverified`. If the local PMTiles CLI is already present, successful explicit structural verification computes SHA-256 and upgrades metadata in place to version 1. If the CLI is absent, P8 leaves the package unverified rather than requiring network access. P8 must not require users to redownload a valid pre-P8 package solely because metadata is older.
 
 Existing field geometry records remain readable. Invalid legacy geometry is surfaced as invalid/unmapped rather than automatically rewritten.
 
@@ -298,10 +307,11 @@ Add `tests/p8-map-robustness.test.js` covering:
 - runtime `ENOSPC` cleanup;
 - interrupted replacement recovery;
 - stale temp cleanup;
-- missing/corrupt package status;
-- explicit integrity verification and metadata upgrade;
+- missing/corrupt/unverified package status;
+- local explicit integrity verification and metadata upgrade;
+- verification without network requirement for version-1 metadata;
 - invalid catalog preserving cached valid catalog;
-- full cross-state coverage;
+- full cross-state catalog-bound coverage;
 - partial cross-state coverage rejection;
 - self-intersecting polygon rejection;
 - degenerate polygon rejection;

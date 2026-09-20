@@ -9,15 +9,23 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 const exists=relative=>fs.existsSync(path.join(root,relative));
 
-test('E2E surface contract covers every agricultural UI contract action plus virtual user surfaces',()=>{
+test('E2E surface contract covers every agricultural UI contract action plus virtual and field surfaces',()=>{
   assert.equal(exists('qa/e2e-surface-contract.json'),true,'missing qa/e2e-surface-contract.json');
   const contract=JSON.parse(read('qa/e2e-surface-contract.json'));
   for(const [screenId,screen] of Object.entries(SCREEN_UI_CONTRACTS)){
     assert.ok(contract.screens.includes(screenId),`screen ${screenId} missing from E2E contract`);
     assert.deepEqual(new Set(contract.actions[screenId]??[]),new Set(Object.keys(screen.actions)),`actions for ${screenId} are incomplete`);
   }
-  for(const screenId of ['overview','admin','iot'])assert.ok(contract.screens.includes(screenId),`virtual screen ${screenId} missing`);
+  for(const screenId of ['overview','admin','iot','field-mode','offline-maps'])assert.ok(contract.screens.includes(screenId),`user surface ${screenId} missing`);
   assert.deepEqual(new Set(contract.journeys),new Set(['agricultural-chain','administration-rbac','inventory-lifecycle','purchase-lifecycle']));
+});
+
+test('P4 and P5 published screens have real runtime renderers',()=>{
+  const runtime=read('web/ui/runtime.jsx');
+  assert.match(runtime,/LavouraFieldMode/);
+  assert.match(runtime,/LavouraOfflineMaps/);
+  assert.match(runtime,/'field-mode':LavouraFieldMode/);
+  assert.match(runtime,/'offline-maps':LavouraOfflineMaps/);
 });
 
 test('browser journeys and successful-run visual evidence are part of the release suite',()=>{
@@ -34,6 +42,7 @@ test('browser journeys and successful-run visual evidence are part of the releas
   const fullSurface=read('tests/e2e/full-surface.spec.mjs');
   assert.match(fullSurface,/e2e-surface-contract\.json/);
   assert.match(fullSurface,/captureStep/);
+  assert.match(fullSurface,/Tela indisponível/,'full-surface must explicitly reject missing renderers');
 });
 
 test('journey specs capture named screenshots after user actions',()=>{

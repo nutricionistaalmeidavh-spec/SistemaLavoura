@@ -11,6 +11,7 @@
   "fields.removeFile": "action-matrix.spec.mjs",
   "fields.saveGeometry": "action-matrix.spec.mjs",
   "fields.addScouting": "action-matrix.spec.mjs",
+  "fields.saveMapPoint": "action-matrix.spec.mjs",
 
   "seasons.save": "agricultural-journey.spec.mjs",
 

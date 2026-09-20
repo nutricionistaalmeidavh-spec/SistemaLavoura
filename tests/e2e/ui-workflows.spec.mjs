@@ -7,32 +7,74 @@ async function enter(page,password){
   await expect(page.getByText('ArtiSys Agro Lavoura').first()).toBeVisible();
 }
 
-test('estoque registra entrada por formulário estruturado',async({page})=>{
+async function createInput(page,{name='NPK E2E',unit='kg',category='Fertilizante',unitCost='12.50'}={}){
+  await page.getByTestId('nav-inputs').click();
+  await page.getByRole('button',{name:/Novo insumo/}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
+  await dialog.getByLabel('Nome',{exact:true}).fill(name);
+  await dialog.getByLabel('Unidade',{exact:true}).selectOption(unit);
+  await dialog.getByLabel('Categoria',{exact:true}).fill(category);
+  await dialog.getByLabel('Custo unitário (R$)',{exact:true}).fill(unitCost);
+  await dialog.getByRole('button',{name:'Salvar insumo',exact:true}).click();
+  await expect(page.getByText(name,{exact:true}).first()).toBeVisible();
+}
+
+async function createField(page,{code='FIN',name='Talhão Finance E2E',farm='Fazenda Finance E2E',areaHa='10'}={}){
+  await page.getByTestId('nav-fields').click();
+  await page.getByRole('button',{name:'Novo talhão'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByLabel('Código',{exact:true}).fill(code);
+  await dialog.getByLabel('Nome',{exact:true}).fill(name);
+  await dialog.getByLabel('Fazenda',{exact:true}).fill(farm);
+  await dialog.getByLabel('Área (ha)',{exact:true}).fill(areaHa);
+  await dialog.getByRole('button',{name:'Criar talhão',exact:true}).click();
+  await expect(page.getByText(name,{exact:true})).toBeVisible();
+}
+
+async function createSeason(page,{crop='Soja',period='2026/27'}={}){
+  await page.getByTestId('nav-seasons').click();
+  await page.getByRole('button',{name:'Nova safra',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
+  await dialog.getByLabel('Cultura',{exact:true}).fill(crop);
+  await dialog.getByLabel('Safra/Período',{exact:true}).fill(period);
+  await dialog.getByRole('button',{name:'Salvar',exact:true}).click();
+  await expect(page.getByText(crop,{exact:true}).first()).toBeVisible();
+}
+
+test('estoque registra entrada por formulário estruturado e insumo legível',async({page})=>{
   await enter(page,'Inventory-Form-2026!');
+  await createInput(page);
   await page.getByTestId('nav-inventory').click();
   await page.getByRole('button',{name:'Registrar entrada'}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByLabel('ID do movimento').fill('movement-e2e');
-  await dialog.getByLabel('SKU/Insumo').fill('NPK-E2E');
-  await dialog.getByLabel('Quantidade').fill('25');
-  await dialog.getByRole('button',{name:'Registrar entrada'}).click();
-  await expect(page.getByText('NPK-E2E').first()).toBeVisible();
+  await expect(dialog.getByLabel('ID do movimento')).toHaveCount(0);
+  await dialog.getByLabel('Insumo',{exact:true}).selectOption({label:'NPK E2E (kg)'});
+  await dialog.getByLabel('Quantidade',{exact:true}).fill('25');
+  await dialog.getByLabel('Lote',{exact:true}).fill('LOT-E2E');
+  await dialog.getByRole('button',{name:'Registrar entrada',exact:true}).click();
+  await expect(page.getByText('NPK E2E (kg)',{exact:true}).first()).toBeVisible();
   await expect(page.getByTestId('action-json')).toHaveCount(0);
 });
 
-test('financeiro registra despesa e atualiza os indicadores',async({page})=>{
+test('financeiro registra despesa em reais com seletores agrícolas e atualiza os indicadores',async({page})=>{
   await enter(page,'Finance-Form-2026!');
+  await createField(page);
+  await createSeason(page);
   await page.getByTestId('nav-finance').click();
   await page.getByRole('button',{name:'Nova despesa'}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByLabel('ID').fill('expense-e2e');
-  await dialog.getByLabel('Safra').fill('season-e2e');
-  await dialog.getByLabel('Talhão').fill('field-e2e');
-  await dialog.getByLabel('Valor (centavos)').fill('150000');
-  await dialog.getByLabel('Descrição').fill('Adubação E2E');
-  await dialog.getByLabel('Categoria').fill('insumos');
-  await dialog.getByRole('button',{name:'Nova despesa'}).click();
-  await expect(page.getByText('Adubação E2E')).toBeVisible();
+  await expect(dialog.getByLabel('ID',{exact:true})).toHaveCount(0);
+  await expect(dialog.getByLabel('Valor (centavos)')).toHaveCount(0);
+  await dialog.getByLabel('Safra',{exact:true}).selectOption({label:'Soja 2026/27'});
+  await dialog.getByLabel('Talhão',{exact:true}).selectOption({label:'Fazenda Finance E2E > Talhão Finance E2E — 10 ha'});
+  await dialog.getByLabel('Valor (R$)',{exact:true}).fill('1500.00');
+  await dialog.getByLabel('Descrição',{exact:true}).fill('Adubação E2E');
+  await dialog.getByLabel('Categoria',{exact:true}).fill('insumos');
+  await dialog.getByRole('button',{name:'Nova despesa',exact:true}).click();
+  await expect(page.getByText('Adubação E2E',{exact:true})).toBeVisible();
+  await expect(page.getByText('R$ 1.500,00',{exact:true}).first()).toBeVisible();
 });
 
 test('relatórios gera CSV e emite documento sem parâmetros técnicos',async({page})=>{

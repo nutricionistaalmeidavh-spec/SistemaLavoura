@@ -31,7 +31,12 @@ export function createAgroLavouraPresentation(options={}){
     async load(){const[layerRecords,fieldRecords]=await Promise.all([gisLayers.list(),base.services.repos.fields.list()]);return Object.freeze({layers:Object.freeze(rows(layerRecords)),fields:Object.freeze(rows(fieldRecords))});}
   });
   const resolve=id=>String(id)==='gis-import'?screen:base.screen(id);
-  return Object.freeze({...base,shell,services,screenIds:()=>Object.freeze([...base.screenIds(),'gis-import']),screen:resolve,async load(id,context){return String(id)==='gis-import'?screen.load(context):base.load(id,context);},async action(id,action,input,context){if(String(id)==='gis-import'){const handler=screen.actions[String(action)];if(typeof handler!=='function')throw new Error(`Unknown action ${String(action)} on screen gis-import.`);return handler(input,context);}return base.action(id,action,input,context);}});
+  return Object.freeze({...base,shell,services,screenIds:()=>Object.freeze([...base.screenIds(),'gis-import']),screen:resolve,async load(id,context){
+    if(String(id)==='gis-import')return screen.load(context);
+    const data=await base.load(id,context);
+    if(String(id)==='fields'&&data?.map){const layerRecords=await gisLayers.list();return Object.freeze({...data,map:Object.freeze({...data.map,gisLayers:Object.freeze(rows(layerRecords))})});}
+    return data;
+  },async action(id,action,input,context){if(String(id)==='gis-import'){const handler=screen.actions[String(action)];if(typeof handler!=='function')throw new Error(`Unknown action ${String(action)} on screen gis-import.`);return handler(input,context);}return base.action(id,action,input,context);}});
 }
 
 export {createGisLayer,geometryForField};

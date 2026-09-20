@@ -109,6 +109,6 @@ test('agricultural-chain uses the UI from field registration through report issu
   await download;
   await expect(page.getByText('Resultado pronto')).toBeVisible();
   await page.getByRole('button',{name:'Emitir documento',exact:true}).click();
-  await expect(page.getByText(/documento/i).first()).toBeVisible();
+  await expect(page.getByText('Documentos emitidos')).toBeVisible();
   await captureStep(page,testInfo,'relatorio-emitido');
 });

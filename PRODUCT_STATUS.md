@@ -5,12 +5,13 @@
 - Produto: `agro-lavoura`
 - Banco: `artisys-safras-talhoes.sqlite`
 - Migrations atuais: `agro-lavoura/001-initial.sql` + `agro-lavoura/002-iot.sql`
-- Telas contratadas: **10**
-- Ações funcionais contratadas: **37** (**17 P0 + 11 P1 + 9 P2**)
+- Telas agrícolas contratadas: **10**
+- Superfícies virtuais adicionais: **Administração** e **Sensores e IoT**
+- Ações funcionais agrícolas contratadas: **37** (**17 P0 + 11 P1 + 9 P2**)
 - Dependência obrigatória paga: **nenhuma**
 - Operação: **local-first / self-hosted**
 - Targets: desktop Electron + PWA/web
-- IoT: camada opcional pronta para integração, sem custo recorrente obrigatório do produto
+- IoT: camada opcional com consulta e configuração local no desktop, sem custo recorrente obrigatório do produto
 
 ## P0 — integridade
 
@@ -49,7 +50,7 @@ Concluído sobre a mesma arquitetura local-first, sem serviço externo obrigató
 - Catálogo persistente para `crop`, `input`, `operation-type`, `unit` e `category`.
 - Feature flags locais para capture, files, PDF, checklists e catálogo.
 
-`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, preservando P0/P1. O contrato agregado permanece **37 ações**.
+`tooling/qa-p2.mjs` executa funcionalmente as **9/9 ações P2** e verifica os **7/7 módulos**, preservando P0/P1. O contrato agrícola agregado permanece **37 ações**.
 
 ## UI Productization
 
@@ -78,13 +79,15 @@ Também foram productizadas, para cumprir o requisito de **zero interface técni
 
 - Insumos;
 - Colheita;
-- Configurações.
+- Configurações;
+- Administração/RBAC;
+- Sensores e IoT.
 
-A camada React permanece somente de apresentação: ações continuam passando pelo mesmo backend, dispatcher, RBAC, auditoria e transações já certificados.
+A camada React permanece somente de apresentação: ações agrícolas continuam passando pelo backend/dispatcher certificado; Administração usa o serviço de segurança; configuração IoT usa o provider local sob `iot:configure` e registra `attempt/success/failure` na auditoria de segurança.
 
 ## UX atual
 
-As 10 telas da navegação agora possuem renderização especializada:
+As 10 telas agrícolas possuem renderização especializada:
 
 1. Dashboard
 2. Talhões
@@ -97,11 +100,21 @@ As 10 telas da navegação agora possuem renderização especializada:
 9. Relatórios
 10. Configurações
 
-Não existe mais `ActionPanel`, `action-json` ou campo `JSON de entrada` na experiência de usuário. Os fluxos E2E passam a cadastrar e operar por formulários humanos.
+Além delas, sessões autorizadas recebem superfícies virtuais de **Administração** e **Sensores e IoT**. Não existe `ActionPanel`, `action-json` ou campo `JSON de entrada` na experiência do usuário. Os fluxos trabalham com formulários e seletores humanos; IDs técnicos e valores em centavos não são exigidos nos fluxos productizados.
 
-## IoT-ready
+## IoT opcional
 
-A migration `002-iot.sql` e a camada `src/iot/` preservam a preparação para integrações opcionais como MQTT, Modbus, LoRaWAN, CAN/J1939, ISOBUS/ISOXML, agrirouter e APIs REST de fornecedores. O núcleo do produto não depende dessas integrações para funcionar e comandos físicos permanecem desativados por padrão.
+A migration `002-iot.sql` e a camada `src/iot/` preservam integrações opcionais como MQTT, Modbus, LoRaWAN, CAN/J1939, ISOBUS/ISOXML, agrirouter e APIs REST de fornecedores. O núcleo do produto não depende dessas integrações para funcionar.
+
+No desktop, usuários com `iot:configure` podem pela UI:
+
+- cadastrar dispositivos;
+- vincular dispositivo a talhão;
+- configurar e ativar/desativar integrações sem editor JSON;
+- criar/remover regras de limiar, dispositivo offline e bateria baixa;
+- configurar limiar, histerese, ocorrências mínimas e severidade.
+
+As regras e seus estados ficam no SQLite local. Alertas IoT entram no mesmo serviço de alertas do produto e usam o ciclo já existente de reconhecer, adiar e dispensar. Segredos de integração não são devolvidos pela API de leitura. Comandos físicos continuam fora da UI e desativados por padrão.
 
 ## CI e release
 
@@ -125,4 +138,4 @@ Essa homologação é uma etapa de migração/cutover para instalações com dad
 
 ## Critério de fechamento
 
-P0/P1/P2 e a productização UI só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo, Playwright aprovado e instalador Windows gerado.
+P0/P1/P2, productização UI e superfícies opcionais só são considerados certificados quando os workflows correspondentes estiverem verdes no mesmo HEAD/PR, com Linux aprovado, Windows aprovado, QA funcional completo, Playwright aprovado e instalador Windows gerado.

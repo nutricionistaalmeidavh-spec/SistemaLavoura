@@ -1,4 +1,7 @@
 import {test,expect} from '@playwright/test';
+import {fileURLToPath} from 'node:url';
+
+const GIS_FIXTURE=fileURLToPath(new URL('../fixtures/p6-talhao.geojson',import.meta.url));
 
 async function enter(page,password){
   await page.goto('/');
@@ -20,13 +23,12 @@ test('P6 importa GeoJSON localmente, salva camada e aplica limite ao talhão',as
   await expect(page.getByText('Talhão Importado',{exact:true}).first()).toBeVisible();
   await page.getByTestId('nav-gis-import').click();
   await expect(page.getByTestId('gis-import-workspace')).toBeVisible();
-  const geojson={type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Limite produtor'},geometry:{type:'Polygon',coordinates:[[[-47.91,-21.22],[-47.89,-21.22],[-47.89,-21.20],[-47.91,-21.20],[-47.91,-21.22]]]}}]};
-  await page.locator('input[type="file"]').setInputFiles({name:'talhao.geojson',mimeType:'application/geo+json',buffer:Buffer.from(JSON.stringify(geojson))});
+  await page.locator('input[type="file"]').setInputFiles(GIS_FIXTURE);
   await expect(page.getByTestId('gis-preview')).toBeVisible();
   await expect(page.getByText('Feições').locator('..').getByText('1',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Salvar camada',exact:true}).click();
-  await expect(page.getByText('talhao',{exact:true}).first()).toBeVisible();
-  await page.getByText('talhao',{exact:true}).first().click();
+  await expect(page.getByText('p6-talhao',{exact:true}).first()).toBeVisible();
+  await page.getByText('p6-talhao',{exact:true}).first().click();
   await page.getByLabel('Talhão').selectOption({label:'GIS-01 · Talhão Importado'});
   await page.getByRole('button',{name:'Aplicar ao talhão',exact:true}).click();
   await page.getByTestId('nav-fields').click();

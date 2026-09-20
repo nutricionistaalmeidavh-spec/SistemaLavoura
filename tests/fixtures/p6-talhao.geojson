@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Limite produtor"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.91, -21.22],
+            [-47.89, -21.22],
+            [-47.89, -21.20],
+            [-47.91, -21.20],
+            [-47.91, -21.22]
+          ]
+        ]
+      }
+    }
+  ]
+}

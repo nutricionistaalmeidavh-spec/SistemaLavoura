@@ -1,0 +1,47 @@
+name: P7 satellite
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/satellite.js'
+      - 'src/presentation-p7.js'
+      - 'web/ui/satellite-raster.js'
+      - 'web/ui/satellite.jsx'
+      - 'web/ui/satellite.css'
+      - 'web/ui/runtime.jsx'
+      - 'web/main.jsx'
+      - 'runtime/host.mjs'
+      - 'tests/p7*.test.js'
+      - 'tests/p6-p7-presentation.test.js'
+      - 'tests/e2e/p7-satellite.spec.mjs'
+      - 'package.json'
+      - '.github/workflows/p7-satellite.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p7-satellite-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run full unit and contract suite
+        run: npm test
+      - name: Build web product
+        run: npm run build:web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run P7 satellite journey
+        run: npx playwright test tests/e2e/p7-satellite.spec.mjs

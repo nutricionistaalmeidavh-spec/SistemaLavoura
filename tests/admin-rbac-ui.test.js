@@ -9,18 +9,21 @@ import {SECURITY_POLICY,PRESENTATION_ACCESS} from '../src/security.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 
-test('administration is a first-class product screen protected by RBAC',()=>{
+test('administration stays outside the agricultural core contract and is protected by RBAC',()=>{
   const shell=createAgroShellModel();
-  assert.ok(shell.navigation.some(item=>item.id==='admin'&&item.group==='Sistema'));
+  assert.equal(shell.navigation.some(item=>item.id==='admin'),false);
   assert.equal(PRESENTATION_ACCESS.screens.admin.read,'users:read');
+  assert.equal(PRESENTATION_ACCESS.screens.admin.write,'users:write');
   assert.ok(SECURITY_POLICY.manager.includes('users:read'));
   assert.ok(SECURITY_POLICY.manager.includes('audit:read'));
   const contract=JSON.parse(read('qa/product-contract.json'));
-  assert.ok(contract.screens.includes('admin'));
+  assert.equal(contract.screens.includes('admin'),false);
 });
 
-test('RPC backend exposes authenticated administration through the existing load/action surface',()=>{
+test('RPC backend exposes permission-filtered virtual administration through load and action',()=>{
   const source=read('runtime/backend.mjs');
+  assert.match(source,/ADMIN_NAVIGATION/);
+  assert.match(source,/ADMIN_SCREEN/);
   assert.match(source,/adminSnapshot/);
   assert.match(source,/screenId==='admin'/);
   for(const operation of ['createUser','setUserRoles','setUserActive','changePassword','listUsers','listAudit']){
@@ -39,6 +42,8 @@ test('administration UI exposes human controls for users permissions audit and p
   assert.match(runtime,/LavouraAdminWorkspace/);
   assert.match(runtime,/admin:LavouraAdminWorkspace/);
   assert.match(runtime,/backend\.describe\(auth\)/);
+  const primitives=read('web/ui/primitives.jsx');
+  assert.match(primitives,/definition\.type==='password'/,'password fields must not render as plain text');
 });
 
 test('admin navigation has a dedicated icon instead of falling back to the product leaf',()=>{

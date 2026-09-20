@@ -35,11 +35,13 @@ export function validateMapManifest(input){
 }
 
 export function farmBoundsFromGeometries({farmUnitId,fields=[],geometries=[]}={}){
-  const scopedIds=new Set(fields.filter(field=>String(field?.farmUnitId??'')===String(farmUnitId??'')).map(field=>String(field.id)));
+  const hasFarm=String(farmUnitId??'').length>0;
+  const scopedIds=new Set(fields.filter(field=>!hasFarm||String(field?.farmUnitId??'')===String(farmUnitId)).map(field=>String(field.id)));
+  if(hasFarm&&scopedIds.size===0)throw new Error('Farm has no mapped field polygons.');
   const points=[];
   for(const geometry of geometries){
     const fieldId=String(geometry?.fieldId??geometry?.id??'');
-    if(scopedIds.size&& !scopedIds.has(fieldId))continue;
+    if(scopedIds.size&&!scopedIds.has(fieldId))continue;
     for(const point of ringOf(geometry))points.push(point);
   }
   if(!points.length)throw new Error('Farm has no mapped field polygons.');
@@ -63,25 +65,7 @@ export function buildFarmMapDownloadPlan({farmUnitId,farmName=null,fields=[],geo
   const areaFraction=Math.max(0.0001,Math.min(1,((bounds[2]-bounds[0])*(bounds[3]-bounds[1]))/Math.max(0.0001,states.reduce((sum,map)=>sum+(map.bounds[2]-map.bounds[0])*(map.bounds[3]-map.bounds[1]),0))));
   const profileFactor=profile==='basic'?0.22:profile==='detailed'?0.52:1;
   const estimatedBytes=Math.max(2_000_000,Math.round(states.reduce((sum,map)=>sum+map.size,0)*areaFraction*profileFactor));
-  return Object.freeze({
-    farmUnitId:String(farmUnitId),
-    farmName:farmName??null,
-    profile,
-    profileLabel:definition.label,
-    minZoom:0,
-    maxZoom:definition.maxZoom,
-    bounds:Object.freeze([...bounds]),
-    bbox,
-    sourceDate,
-    sourceBuild:build,
-    extractSource:`https://build.protomaps.com/${build}.pmtiles`,
-    sources:Object.freeze(sources),
-    outputAsset:`farm-${safeId(farmUnitId)}-${profile}.pmtiles`,
-    estimatedBytes,
-    attribution:'Protomaps © OpenStreetMap contributors',
-    requiresNetwork:true,
-    localAfterInstall:true
-  });
+  return Object.freeze({farmUnitId:String(farmUnitId),farmName:farmName??null,profile,profileLabel:definition.label,minZoom:0,maxZoom:definition.maxZoom,bounds:Object.freeze([...bounds]),bbox,sourceDate,sourceBuild:build,extractSource:`https://build.protomaps.com/${build}.pmtiles`,sources:Object.freeze(sources),outputAsset:`farm-${safeId(farmUnitId)}-${profile}.pmtiles`,estimatedBytes,attribution:'Protomaps © OpenStreetMap contributors',requiresNetwork:true,localAfterInstall:true});
 }
 
 export const MAP_DOWNLOAD_PROFILES=PROFILES;

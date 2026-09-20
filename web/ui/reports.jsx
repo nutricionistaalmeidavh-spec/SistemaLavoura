@@ -1,6 +1,7 @@
 import React,{useMemo,useState} from 'react';
 import {getUiContract} from './contracts.js';
 import {DataTable,KpiStrip,Modal,PageHeader,StructuredForm,dateTime,money,recordRows} from './primitives.jsx';
+import {downloadBinaryFile,downloadExportResult,downloadTextFile} from './downloads.js';
 
 const issuedColumns=[
   {key:'title',label:'Documento'},
@@ -28,6 +29,7 @@ function parseCsv(content,columns){
   const split=line=>{const out=[];let value='',quoted=false;for(let i=0;i<line.length;i++){const char=line[i];if(char==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(char===','&&!quoted){out.push(value);value='';}else value+=char;}out.push(value);return out;};
   const headers=split(lines[0]);return lines.slice(1).map(line=>Object.fromEntries(split(line).map((value,index)=>[headers[index]??columns[index],value])));
 }
+const fileBase=(type,definitions)=>String(definitions[type]?.title??type??'relatorio').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase()||'relatorio';
 
 export function LavouraReportsWorkspace({data,onRun}){
   const contract=getUiContract('reports');
@@ -48,10 +50,10 @@ export function LavouraReportsWorkspace({data,onRun}){
   const [lastResult,setLastResult]=useState(null);
   const [dialog,setDialog]=useState(null);
 
-  async function generateCsv(type=selectedType){setBusy(true);try{const result=await onRun('csv',{type});setLastResult({kind:'csv',type,result});return result;}finally{setBusy(false);}}
-  async function generatePdf(){setBusy(true);try{const csv=await onRun('csv',{type:selectedType});const columns=definitions[selectedType]?.columns??[];const rows=parseCsv(csv?.content,columns);const result=await onRun('pdf',{type:selectedType,title:definitions[selectedType]?.title,rows});setLastResult({kind:'pdf',type:selectedType,result});}finally{setBusy(false);}}
+  async function generateCsv(type=selectedType){setBusy(true);try{const result=await onRun('csv',{type});setLastResult({kind:'csv',type,result});downloadTextFile(result?.content??'',{name:`${fileBase(type,definitions)}.csv`,mimeType:'text/csv;charset=utf-8'});return result;}finally{setBusy(false);}}
+  async function generatePdf(){setBusy(true);try{const csv=await onRun('csv',{type:selectedType});const columns=definitions[selectedType]?.columns??[];const rows=parseCsv(csv?.content,columns);const result=await onRun('pdf',{type:selectedType,title:definitions[selectedType]?.title,rows});setLastResult({kind:'pdf',type:selectedType,result});downloadBinaryFile(result?.content,{name:`${fileBase(selectedType,definitions)}.pdf`,mimeType:'application/pdf'});}finally{setBusy(false);}}
   async function issue(){if(!lastResult)throw new Error('Gere um documento antes de emitir.');const result=lastResult.result;await onRun('issue',{id:`doc-${Date.now()}`,type:lastResult.type,format:lastResult.kind,content:result.content,title:result.title??definitions[lastResult.type]?.title});setLastResult(null);}
-  async function runDialog(values){setBusy(true);try{if(dialog==='summary'){const rows=issuedRows.map(item=>item.row);const result=await onRun('summary',{rows,...values});setLastResult({kind:'summary',type:selectedType,result});}else if(dialog==='export'){const rows=issuedRows.map(item=>item.row);const result=await onRun('export',{rows,...values});setLastResult({kind:'export',type:selectedType,result});}setDialog(null);}finally{setBusy(false);}}
+  async function runDialog(values){setBusy(true);try{if(dialog==='summary'){const rows=issuedRows.map(item=>item.row);const result=await onRun('summary',{rows,...values});setLastResult({kind:'summary',type:selectedType,result});}else if(dialog==='export'){const rows=issuedRows.map(item=>item.row);const result=await onRun('export',{rows,...values});downloadExportResult(result,{format:values.format,nameBase:'historico-relatorios'});setLastResult({kind:'export',type:selectedType,result});}setDialog(null);}finally{setBusy(false);}}
 
   return <section className="product-workspace" data-testid="reports-workspace">
     <PageHeader eyebrow="Gestão" title="Relatórios" description="Compare safras e talhões, acompanhe indicadores gerenciais e gere documentos persistidos." actions={<><button type="button" onClick={()=>setDialog('summary')}>Resumo das emissões</button><button type="button" onClick={()=>setDialog('export')}>Exportar histórico</button></>}/>

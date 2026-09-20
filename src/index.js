@@ -7,6 +7,8 @@ export function recordHarvest({id,seasonId,fieldId,quantity,unit,harvestedAt,met
 export * from './catalog.js';
 export * from './operations.js';
 export * from './finance.js';
+export * from './field-notebook.js';
+export * from './agricultural-workflow.js';
 export { createAgroShellModel, agroTheme } from './ui.js';
 export { createAgroLavouraPresentation } from './presentation.js';
 export * from './inventory.js';

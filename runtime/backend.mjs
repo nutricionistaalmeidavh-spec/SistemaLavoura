@@ -7,7 +7,7 @@ const ADMIN_NAVIGATION=Object.freeze({id:'admin',label:'Administração',icon:'s
 const ADMIN_SCREEN=Object.freeze({id:'admin',title:'Administração',kind:'admin',actionDefinitions:Object.freeze({})});
 const IOT_NAVIGATION=Object.freeze({id:'iot',label:'Sensores e IoT',icon:'radio',group:'Integrações'});
 const IOT_SCREEN=Object.freeze({id:'iot',title:'Sensores e IoT',kind:'iot',actionDefinitions:Object.freeze({})});
-const IOT_SETUP_ACTIONS=new Set(['saveDevice','bindField','saveAdapterConfig','saveRule','removeRule']);
+const IOT_SETUP_ACTIONS=new Set(['saveDevice','bindField','saveAdapterConfig','setAdapterEnabled','saveRule','removeRule']);
 const EMPTY_IOT=Object.freeze({available:false,source:'browser',readOnly:true,reason:'desktop-required',devices:Object.freeze([]),telemetry:Object.freeze([]),alerts:Object.freeze([]),integrations:Object.freeze([]),rules:Object.freeze([]),fieldOptions:Object.freeze([]),capabilities:Object.freeze({configure:false})});
 
 const safeIoTDevice=device=>Object.freeze({id:device?.id,name:device?.name,type:device?.type,protocol:device?.protocol,manufacturer:device?.manufacturer??null,model:device?.model??null,status:device?.status??'unknown',lastSeenAt:device?.lastSeenAt??null,batteryLevel:device?.batteryLevel??null,signalStrength:device?.signalStrength??null,fieldId:device?.fieldId??null,fieldName:device?.fieldName??null});
@@ -104,7 +104,13 @@ export function createRpcBackend({presentation,iot=null}){
     async login({username,password}={}){return security.authenticate({username,password});},
     async validate(auth){return requireSession(auth);},
     async logout(auth){return security.revoke(credentials(auth));},
-    async load({screenId,auth,context={}}={}){if(screenId==='admin')return adminSnapshot(auth);if(screenId==='iot')return iotSnapshot(auth);await requireSession(auth,permissionFor(screenId,'read'));return presentation.load(screenId,context);},
+    async load({screenId,auth,context={}}={}){
+      if(screenId==='admin')return adminSnapshot(auth);
+      if(screenId==='iot')return iotSnapshot(auth);
+      await requireSession(auth,permissionFor(screenId,'read'));
+      if(screenId==='overview'&&typeof iot?.refreshAlerts==='function'&&await allowed(auth,'iot:read'))await iot.refreshAlerts();
+      return presentation.load(screenId,context);
+    },
     async action({screenId,action,input={},auth,context={}}={}){if(screenId==='admin')return adminAction({action,input,auth});if(screenId==='iot')return iotAction({action,input,auth});return commands.execute({screenId,action,input,auth,context});}
   });
 }

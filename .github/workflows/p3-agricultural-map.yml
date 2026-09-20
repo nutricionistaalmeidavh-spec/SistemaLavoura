@@ -43,4 +43,4 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run P3 field journey
-        run: npx playwright test tests/e2e/p3-agricultural-map.spec.mjs --project=chromium
+        run: npx playwright test tests/e2e/p3-agricultural-map.spec.mjs

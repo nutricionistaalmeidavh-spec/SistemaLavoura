@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 
 const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+const cors={'access-control-allow-origin':'*','access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':'content-type, accept'};
 async function enter(page,password){
   await page.goto('/');
   await page.getByTestId('password').fill(password);
@@ -9,13 +10,20 @@ async function enter(page,password){
 }
 
 test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({page})=>{
+  let searches=0;
   await page.route('https://stac.dataspace.copernicus.eu/v1/search',async route=>{
-    const body=route.request().postDataJSON();
+    const request=route.request();
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+    expect(request.method()).toBe('POST');searches+=1;
+    const body=request.postDataJSON();
     expect(body.collections).toEqual(['sentinel-2-l2a']);
     expect(body.bbox).toHaveLength(4);
-    await route.fulfill({status:200,contentType:'application/geo+json',body:JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',id:'S2-TEST',collection:'sentinel-2-l2a',bbox:[-47.92,-21.23,-47.88,-21.19],properties:{datetime:'2026-09-18T10:00:00Z','eo:cloud_cover':4},assets:{thumbnail:{href:'https://example.test/s2.png'},B04_10m:{href:'https://example.test/red.tif'},B08_10m:{href:'https://example.test/nir.tif'}}}]})});
+    await route.fulfill({status:200,contentType:'application/geo+json',headers:cors,body:JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',id:'S2-TEST',collection:'sentinel-2-l2a',bbox:[-47.92,-21.23,-47.88,-21.19],properties:{datetime:'2026-09-18T10:00:00Z','eo:cloud_cover':4},assets:{thumbnail:{href:'https://example.test/s2.png'},B04_10m:{href:'https://example.test/red.tif'},B08_10m:{href:'https://example.test/nir.tif'}}}]})});
   });
-  await page.route('https://example.test/s2.png',route=>route.fulfill({status:200,contentType:'image/png',body:pixel}));
+  await page.route('https://example.test/s2.png',async route=>{
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+    return route.fulfill({status:200,contentType:'image/png',headers:cors,body:pixel});
+  });
   await enter(page,'P7-Sat-2026!');
   await page.getByTestId('nav-fields').click();
   await page.getByRole('button',{name:'Novo talhão'}).click();
@@ -34,6 +42,7 @@ test('P7 busca Sentinel pelo talhão e mantém preview no cache local',async({pa
   await expect(page.getByTestId('satellite-workspace')).toBeVisible();
   await page.getByLabel('Talhão').selectOption({label:'SAT-01 · Talhão Satélite'});
   await page.getByRole('button',{name:'Buscar imagens',exact:true}).click();
+  await expect.poll(()=>searches).toBe(1);
   const scenes=page.locator('.satellite-scenes');
   await expect(scenes.getByText('Sentinel-2 · Copernicus',{exact:true})).toBeVisible();
   await expect(scenes.getByText('Nuvens: 4%',{exact:true})).toBeVisible();

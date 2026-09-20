@@ -22,7 +22,7 @@ Inventário da superfície funcional publicada pelo produto.
 | Superfície | Permissão | Funcionalidades expostas |
 |---|---|---|
 | Administração (`admin`) | leitura `users:read`; escrita `users:write` | criar usuário, alterar papéis, ativar/desativar usuário, alterar própria senha; consulta de auditoria conforme `audit:read` |
-| Sensores e IoT (`iot`) | leitura `iot:read`; configuração `iot:configure` | consultar dispositivos/telemetria/integrações/alertas; `saveDevice`, `bindField`, `saveAdapterConfig`, `saveRule`, `removeRule` |
+| Sensores e IoT (`iot`) | leitura `iot:read`; configuração `iot:configure` | consultar dispositivos/telemetria/integrações/alertas; `saveDevice`, `bindField`, `saveAdapterConfig`, `setAdapterEnabled`, `saveRule`, `removeRule` |
 
 A superfície IoT é opcional. Regras de limiar, offline e bateria usam estado persistente local e alimentam o mesmo serviço de alertas do produto. A configuração não devolve segredos na leitura e não publica controles físicos na UI.
 

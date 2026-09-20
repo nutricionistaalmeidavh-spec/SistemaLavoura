@@ -1,6 +1,7 @@
 import {spawn} from 'node:child_process';
 import {readdir} from 'node:fs/promises';
-import {basename,fileURLToPath} from 'node:path';
+import {basename} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {currentCommit,writeEvidence} from './evidence.mjs';
 
 const summaryPath=fileURLToPath(new URL('../qa-artifacts/playwright-summary.json',import.meta.url));

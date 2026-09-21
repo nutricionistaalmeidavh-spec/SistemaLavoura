@@ -30,7 +30,7 @@ export function validatePolygonRingTopology(ring,path='ring'){
   if(!Array.isArray(ring)||ring.length<4)throw new TypeError(`${path} Polygon ring requires at least four positions.`);
   if(!samePosition(ring[0],ring.at(-1)))throw new TypeError(`${path} Polygon ring must be closed.`);
   const unique=new Set(ring.slice(0,-1).map(point=>`${point[0]},${point[1]}`));
-  if(unique.size<3||ringArea(ring)<=1e-14)throw new TypeError(`${path} Polygon ring is degenerate.`);
+  if(unique.size<3)throw new TypeError(`${path} Polygon ring is degenerate.`);
   const segmentCount=ring.length-1;
   for(let first=0;first<segmentCount;first+=1){
     for(let second=first+1;second<segmentCount;second+=1){
@@ -39,6 +39,7 @@ export function validatePolygonRingTopology(ring,path='ring'){
       if(segmentsIntersect(ring[first],ring[first+1],ring[second],ring[second+1]))throw new TypeError(`${path} Polygon ring is self-intersecting.`);
     }
   }
+  if(ringArea(ring)<=1e-14)throw new TypeError(`${path} Polygon ring is degenerate.`);
   return ring;
 }
 

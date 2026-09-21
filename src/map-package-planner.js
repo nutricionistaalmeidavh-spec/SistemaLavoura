@@ -14,6 +14,31 @@ function ringOf(geometry){
   return ring.filter(point=>Array.isArray(point)&&point.length>=2&&Number.isFinite(Number(point[0]))&&Number.isFinite(Number(point[1]))).map(point=>[Number(point[0]),Number(point[1])]);
 }
 
+export function boundsFullyCovered(target,sources){
+  if(!validBounds(target)||!Array.isArray(sources)||!sources.length)return false;
+  const [minX,minY,maxX,maxY]=target;
+  const clipped=sources.filter(validBounds).map(bounds=>[
+    Math.max(minX,bounds[0]),Math.max(minY,bounds[1]),Math.min(maxX,bounds[2]),Math.min(maxY,bounds[3])
+  ]).filter(bounds=>bounds[0]<=bounds[2]&&bounds[1]<=bounds[3]);
+  if(!clipped.length)return false;
+  const cuts=[...new Set([minX,maxX,...clipped.flatMap(bounds=>[bounds[0],bounds[2]])])].sort((a,b)=>a-b);
+  if(cuts[0]!==minX||cuts.at(-1)!==maxX)return false;
+  for(let index=0;index<cuts.length-1;index+=1){
+    const left=cuts[index],right=cuts[index+1];
+    if(right<=left)continue;
+    const x=(left+right)/2;
+    const intervals=clipped.filter(bounds=>bounds[0]<=x&&bounds[2]>=x).map(bounds=>[bounds[1],bounds[3]]).sort((a,b)=>a[0]-b[0]);
+    let cursor=minY;
+    for(const [start,end] of intervals){
+      if(start>cursor+1e-10)break;
+      cursor=Math.max(cursor,end);
+      if(cursor>=maxY-1e-10)break;
+    }
+    if(cursor<maxY-1e-10)return false;
+  }
+  return true;
+}
+
 export function validateMapManifest(input){
   if(!input||typeof input!=='object')throw new TypeError('Map manifest is required.');
   if(input.schemaVersion!==1)throw new TypeError('Unsupported map manifest schemaVersion.');
@@ -56,6 +81,7 @@ export function buildFarmMapDownloadPlan({farmUnitId,farmName=null,fields=[],geo
   const bounds=farmBoundsFromGeometries({farmUnitId,fields,geometries});
   const states=checked.maps.filter(map=>map.available===true&&map.kind!=='national'&&intersects(bounds,map.bounds));
   if(!states.length)throw new Error('No available map package covers this farm.');
+  if(!boundsFullyCovered(bounds,states.map(map=>map.bounds)))throw new Error('Available map packages do not provide complete map coverage for this farm.');
   const base=releaseBase(checked.releaseVersion);
   const sources=states.map(map=>Object.freeze({id:map.id,name:map.name,asset:map.asset,size:map.size,sha256:map.sha256,minZoom:map.minZoom,maxZoom:map.maxZoom,url:`${base}/${map.asset}`}));
   const sourceDate=states.map(map=>map.sourceDate).filter(Boolean).sort().at(-1);

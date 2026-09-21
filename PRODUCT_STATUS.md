@@ -114,6 +114,25 @@ Concluído como capacidade opcional, sem dependência operacional do núcleo.
 - credenciais externas não são persistidas pelo produto;
 - nenhuma chave compartilhada ArtiSys ou assinatura obrigatória.
 
+## P8 — robustez de mapas e GIS
+
+Concluído no código e submetido a gate dedicado de certificação.
+
+- códigos de erro estáveis e mensagens acionáveis para catálogo, fonte, disco, verificação, corrupção e recuperação;
+- catálogo remoto validado antes de substituir o último catálogo local válido;
+- promoção transacional de PMTiles com journal, `.part`, backup conhecido-bom e reconciliação após interrupção;
+- recuperação preserva evidência quando o journal ou metadata local estão corrompidos, sem apagar silenciosamente um PMTiles potencialmente válido;
+- metadados locais versionados com tamanho, SHA-256, instante de verificação e versão do catálogo;
+- estados de saúde `healthy`, `unverified`, `outdated`, `missing` e `corrupt` expostos na UI;
+- SHA completo executado sob ação explícita **Verificar integridade**, evitando rehash automático de arquivos grandes a cada abertura;
+- cobertura estadual só é aceita quando a união dos pacotes disponíveis cobre integralmente o retângulo da fazenda, inclusive em propriedades multiestado;
+- importações GIS rejeitam anéis auto-intersectantes e degenerados, preservando vértices colineares válidos;
+- polígonos manuais legados não fechados continuam legíveis por fechamento apenas em memória, sem reescrever persistência;
+- geometria legada inválida é isolada no read-model sem derrubar os demais talhões;
+- snapshot do mapa usa índices por entidade/talhão; fixture de regressão cobre **5.000 talhões**;
+- PWA mantém Modo Campo disponível e informa explicitamente que criação/verificação de PMTiles regionais exige o desktop Windows;
+- jornada Playwright P8 roda em processo isolado e o `qa-web` falha fechado se a spec especializada desaparecer.
+
 ## UI / UX
 
 Todas as áreas-base possuem renderização especializada e não dependem de editor técnico JSON. O produto usa formulários, seletores humanos e valores em unidades/reais; IDs técnicos permanecem internos sempre que o fluxo productizado permite.
@@ -154,8 +173,9 @@ Workflows de produto:
 - `P4 P5 field offline`
 - `P6 GIS import`
 - `P7 satellite`
+- `P8 map robustness`
 
-Node de produto permanece 22. O build Windows usa `--publish never`. Os gates P6/P7 executam suíte completa, build web e jornadas Playwright próprias; P0–P5 continuam responsáveis pelos regressivos e certificação/instalador existentes.
+Node de produto permanece 22. O build Windows usa `--publish never`. Os gates P6/P7/P8 executam suíte completa, build web e jornadas Playwright próprias; P0–P5 continuam responsáveis pelos regressivos e certificação/instalador existentes.
 
 ## Banco legado real
 
@@ -169,4 +189,4 @@ A homologação de banco legado é uma etapa de cutover para instalações exist
 
 ## Critério de fechamento
 
-P0, P1, P2, P3, P4/P5, P6 e P7 só são considerados certificados comercialmente quando os workflows correspondentes estiverem verdes no **mesmo HEAD/PR**, incluindo testes, build web/PWA, Playwright, compatibilidade, certificação Windows e contratos específicos de mapas/GIS/satélite.
+P0, P1, P2, P3, P4/P5, P6, P7 e P8 só são considerados certificados comercialmente quando os workflows correspondentes estiverem verdes no **mesmo HEAD/PR**, incluindo testes, build web/PWA, Playwright, compatibilidade, certificação Windows e contratos específicos de mapas/GIS/satélite.

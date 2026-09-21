@@ -9,6 +9,7 @@ const offlineMapsNav=Object.freeze({id:'offline-maps',label:'Mapas offline',icon
 const observationDefinition=Object.freeze({name:'saveObservation',label:'Registrar observação',description:'Salva uma observação georreferenciada localmente para uso sem internet.',intent:'primary',confirm:null,requiresSelection:false,fields:Object.freeze([])});
 const removeObservationDefinition=Object.freeze({name:'removeObservation',label:'Excluir observação',description:'Remove uma observação de campo local.',intent:'danger',confirm:'Excluir esta observação?',requiresSelection:true,fields:Object.freeze([])});
 const installMapDefinition=Object.freeze({name:'installFarmMap',label:'Disponibilizar fazenda offline',description:'Recorta e instala somente a região mapeada da fazenda.',intent:'primary',confirm:null,requiresSelection:false,fields:Object.freeze([])});
+const verifyMapDefinition=Object.freeze({name:'verifyFarmMap',label:'Verificar integridade',description:'Verifica o pacote PMTiles local sem alterar dados agrícolas.',intent:'secondary',confirm:null,requiresSelection:true,fields:Object.freeze([])});
 const removeMapDefinition=Object.freeze({name:'removeFarmMap',label:'Remover mapa offline',description:'Remove um pacote local de mapa da fazenda.',intent:'danger',confirm:'Remover este mapa offline?',requiresSelection:true,fields:Object.freeze([])});
 
 async function fieldModeData(base,observations){
@@ -73,9 +74,10 @@ export function createAgroLavouraPresentation(options={}){
         }
         return mapPackages.installFarmMap({...input,bounds,profile:input.profile??'detailed',estimatedBytes:plan?.estimatedBytes,extractSource:plan?.extractSource,sourceDate:plan?.sourceDate});
       },
+      verifyFarmMap:input=>{if(typeof mapPackages?.verifyFarmMap!=='function')throw new Error('Verificação de mapas requer o aplicativo desktop.');return mapPackages.verifyFarmMap(input);},
       removeFarmMap:input=>{if(typeof mapPackages?.removeFarmMap!=='function')throw new Error('Gerenciamento de mapas requer o aplicativo desktop.');return mapPackages.removeFarmMap(input);}
     }),
-    actionDefinitions:Object.freeze({installFarmMap:installMapDefinition,removeFarmMap:removeMapDefinition}),
+    actionDefinitions:Object.freeze({installFarmMap:installMapDefinition,verifyFarmMap:verifyMapDefinition,removeFarmMap:removeMapDefinition}),
     load:()=>offlineMapsData(base,mapPackages)
   });
 

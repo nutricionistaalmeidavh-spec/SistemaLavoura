@@ -7,7 +7,7 @@ import {currentCommit,writeEvidence} from './evidence.mjs';
 const summaryPath=fileURLToPath(new URL('../qa-artifacts/playwright-summary.json',import.meta.url));
 const e2eDir=fileURLToPath(new URL('../tests/e2e/',import.meta.url));
 const playwrightCli=fileURLToPath(new URL('../node_modules/@playwright/test/cli.js',import.meta.url));
-const SPECIALIZED=Object.freeze(['p6-gis-import.spec.mjs','p7-satellite.spec.mjs']);
+const SPECIALIZED=Object.freeze(['p6-gis-import.spec.mjs','p7-satellite.spec.mjs','p8-map-robustness.spec.mjs']);
 
 export function buildPlaywrightSummary({commit,exitCode,startedAt,finishedAt}){
   if(!/^[0-9a-f]{40}$/.test(commit))throw new Error('commit must be a full git sha');
@@ -21,7 +21,8 @@ export function partitionE2eFiles(files){
   return Object.freeze({
     baseline:Object.freeze(specs.filter(name=>!SPECIALIZED.includes(name)).map(name=>`tests/e2e/${name}`)),
     p6:Object.freeze(['tests/e2e/p6-gis-import.spec.mjs']),
-    p7:Object.freeze(['tests/e2e/p7-satellite.spec.mjs'])
+    p7:Object.freeze(['tests/e2e/p7-satellite.spec.mjs']),
+    p8:Object.freeze(['tests/e2e/p8-map-robustness.spec.mjs'])
   });
 }
 
@@ -42,6 +43,7 @@ export async function runQaWeb(){
     exitCode=await runPlaywright(partitions.baseline,'baseline-p0-p5');
     if(exitCode===0)exitCode=await runPlaywright(partitions.p6,'p6-gis');
     if(exitCode===0)exitCode=await runPlaywright(partitions.p7,'p7-satellite');
+    if(exitCode===0)exitCode=await runPlaywright(partitions.p8,'p8-map-robustness');
   }finally{
     const finishedAt=new Date().toISOString();
     await writeEvidence(summaryPath,buildPlaywrightSummary({commit,exitCode,startedAt,finishedAt}));

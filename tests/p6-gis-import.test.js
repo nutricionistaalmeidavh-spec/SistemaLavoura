@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {normalizeGisFeatureCollection,createGisLayer,geometryForField} from '../src/gis-import.js';
+import {normalizeGisFeatureCollection,normalizeGisGeometry,createGisLayer,geometryForField} from '../src/gis-import.js';
 import {buildAgriculturalMapSnapshot} from '../src/agricultural-map.js';
 
 test('P6 normalizes GeoJSON and preserves MultiPolygon',()=>{
@@ -49,4 +49,14 @@ test('P6 map snapshot and renderer preserve all MultiPolygon parts',()=>{
   const renderer=fs.readFileSync(new URL('../web/ui/agricultural-map.jsx',import.meta.url),'utf8');
   assert.match(renderer,/geometry\?\.rings/);
   assert.match(renderer,/\.map\(\(ring/);
+});
+
+test('P8 rejects self-intersecting and zero-area GIS polygons',()=>{
+  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[2,2],[0,2],[2,0],[0,0]]]}),/self-intersect/i);
+  assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[1,0],[2,0],[0,0]]]}),/degenerate|area/i);
+});
+
+test('P8 accepts a valid ring with a redundant collinear vertex',()=>{
+  const geometry=normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[1,0],[2,0],[2,1],[0,1],[0,0]]]});
+  assert.equal(geometry.type,'Polygon');
 });

@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'src/satellite.js'
+      - 'src/gis-import.js'
+      - 'src/agricultural-map.js'
       - 'src/presentation-p7.js'
       - 'web/ui/satellite-raster.js'
       - 'web/ui/satellite.jsx'

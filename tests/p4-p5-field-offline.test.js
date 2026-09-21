@@ -86,5 +86,7 @@ test('P4/P5 UI wiring includes field mode, offline maps and PWA registration',()
   assert.match(index,/manifest\.webmanifest/);
   assert.match(presentation,/field-mode/);
   assert.match(presentation,/offline-maps/);
+  assert.match(presentation,/verifyFarmMap/);
+  assert.match(presentation,/Verificar integridade/);
   assert.doesNotMatch(fieldMode,/seasonId:.*['"]field-mode['"]/);
 });

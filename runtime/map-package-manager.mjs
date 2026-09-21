@@ -18,6 +18,17 @@ const ensureBounds=bounds=>{if(!Array.isArray(bounds)||bounds.length!==4||!bound
 const exists=async path=>{try{await access(path);return true;}catch{return false;}};
 const atomicJson=async(path,value)=>{const temp=`${path}.tmp-${process.pid}-${Date.now()}`;await writeFile(temp,`${JSON.stringify(value,null,2)}\n`);await rename(temp,path);};
 const sha256Buffer=buffer=>createHash('sha256').update(buffer).digest('hex');
+async function sha256File(path){
+  const {createReadStream}=await import('node:fs');
+  return new Promise((resolveDigest,reject)=>{
+    const hash=createHash('sha256'),stream=createReadStream(path);
+    stream.on('data',chunk=>hash.update(chunk));
+    stream.on('error',reject);
+    stream.on('end',()=>resolveDigest(hash.digest('hex')));
+  });
+}
+function releaseParts(value){const match=/^(\d{4})\.(\d{2})\.(\d+)$/.exec(String(value??''));return match?[Number(match[1]),Number(match[2]),Number(match[3])]:null;}
+function newerRelease(candidate,current){const a=releaseParts(candidate),b=releaseParts(current);if(!a||!b)return false;for(let i=0;i<3;i+=1)if(a[i]!==b[i])return a[i]>b[i];return false;}
 
 export class MapPackageError extends Error{
   constructor(code,message,{retryable=false,cause=null}={}){
@@ -60,6 +71,10 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
     if(!name||name!==raw)throw new MapPackageError('MAP_RECOVERY_FAILED','Registro de recuperação contém caminho inválido.');
     return name;
   };
+  const addRecoveryIssue=issue=>{
+    const normalized=Object.freeze({code:String(issue.code??'MAP_RECOVERY_FAILED'),id:String(issue.id??''),message:String(issue.message??'Falha de recuperação de mapa.')});
+    if(!recoveryIssues.some(current=>current.code===normalized.code&&current.id===normalized.id&&current.message===normalized.message))recoveryIssues.push(normalized);
+  };
 
   async function reconcilePackages(){
     recoveryIssues=[];
@@ -84,9 +99,9 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
         }
         await rm(tempPath,{force:true});
         if(finalExists)await rm(path,{force:true});
-        else recoveryIssues.push(Object.freeze({code:'MAP_RECOVERY_FAILED',id:record.id,message:'Não foi possível restaurar o pacote offline.'}));
+        else addRecoveryIssue({code:'MAP_RECOVERY_FAILED',id:record.id,message:'Não foi possível restaurar o pacote offline.'});
       }catch(error){
-        recoveryIssues.push(Object.freeze({code:'MAP_RECOVERY_FAILED',id:name.replace('.transaction.json',''),message:error?.message||'Registro de recuperação inválido.'}));
+        addRecoveryIssue({code:'MAP_RECOVERY_FAILED',id:name.replace('.transaction.json',''),message:error?.message||'Registro de recuperação inválido.'});
       }
     }
     for(const name of names.filter(value=>/\.part-[^/]*\.pmtiles$/.test(value))){
@@ -132,7 +147,24 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
     await init();
     const names=(await readdir(packages)).filter(name=>name.endsWith('.json')&&!name.endsWith('.transaction.json')).sort();
     const values=[];
-    for(const name of names){try{values.push(JSON.parse(await readFile(join(packages,name),'utf8')));}catch{}}
+    for(const name of names){
+      const id=name.slice(0,-5);
+      try{
+        const metadata=JSON.parse(await readFile(join(packages,name),'utf8'));
+        const fileName=localName(metadata.fileName),filePath=join(packages,fileName);
+        let health='missing';
+        if(await exists(filePath)){
+          const info=await stat(filePath);
+          if(metadata.metadataVersion!==1||typeof metadata.sha256!=='string'||!/^[a-f0-9]{64}$/.test(metadata.sha256))health='unverified';
+          else if(!Number.isFinite(Number(metadata.size))||info.size!==Number(metadata.size))health='corrupt';
+          else if(newerRelease(catalogCache?.releaseVersion,metadata.catalogVersion))health='outdated';
+          else health='healthy';
+        }
+        values.push(Object.freeze({...metadata,health}));
+      }catch(error){
+        addRecoveryIssue({code:'MAP_PACKAGE_CORRUPT',id,message:error?.message||'Metadados locais do mapa estão corrompidos.'});
+      }
+    }
     return values;
   }
   async function snapshot(){
@@ -170,6 +202,7 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
       catch(error){throw normalizeMapPackageError(error,'MAP_VERIFY_FAILED');}
       const info=await stat(tempPath);
       if(info.size<=0)throw new MapPackageError('MAP_PACKAGE_EMPTY','O mapa extraído está vazio.');
+      const digest=await sha256File(tempPath),catalog=await loadCachedCatalog();
       await writeJournal(recordId,{...journalBase,stage:'verified-temp'});
       if(await exists(finalPath)){
         await rm(backupPath,{force:true});
@@ -178,7 +211,7 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
       }
       await rename(tempPath,finalPath);
       await writeJournal(recordId,{...journalBase,stage:'final-promoted'});
-      const record=Object.freeze({id:recordId,farmUnitId:String(input.farmUnitId),farmName:input.farmName??null,profile,profileLabel:plan.profileLabel,fileName:basename(finalPath),size:info.size,bounds:Object.freeze([...bounds]),minZoom:plan.minZoom,maxZoom:plan.maxZoom,sourceUrl:plan.extractSource,sourceDate:plan.sourceDate,attribution:plan.attribution,installedAt:new Date().toISOString()});
+      const record=Object.freeze({metadataVersion:1,id:recordId,farmUnitId:String(input.farmUnitId),farmName:input.farmName??null,profile,profileLabel:plan.profileLabel,fileName:basename(finalPath),size:info.size,sha256:digest,verifiedAt:now().toISOString(),catalogVersion:catalog?.releaseVersion??null,bounds:Object.freeze([...bounds]),minZoom:plan.minZoom,maxZoom:plan.maxZoom,sourceUrl:plan.extractSource,sourceDate:plan.sourceDate,attribution:plan.attribution,installedAt:now().toISOString()});
       await atomicJson(metadataPath,record);
       metadataCommitted=true;
       await writeJournal(recordId,{...journalBase,stage:'metadata-written'});
@@ -197,9 +230,33 @@ export function createMapPackageManager({dataDir,fetchImpl=globalThis.fetch,exec
       throw normalizeMapPackageError(error,'MAP_EXTRACT_FAILED');
     }finally{active.delete(key);}
   }
+  async function verifyFarmMap({id}={}){
+    await init();
+    const clean=safeId(id),metadataPath=join(packages,`${clean}.json`);
+    if(!(await exists(metadataPath)))throw new MapPackageError('MAP_PACKAGE_MISSING','Metadados do mapa local não foram encontrados.');
+    let metadata;
+    try{metadata=JSON.parse(await readFile(metadataPath,'utf8'));}
+    catch(error){throw new MapPackageError('MAP_PACKAGE_CORRUPT','Metadados locais do mapa estão corrompidos.',{cause:error});}
+    let fileName;
+    try{fileName=localName(metadata.fileName);}
+    catch(error){throw new MapPackageError('MAP_PACKAGE_CORRUPT','Metadados locais do mapa contêm caminho inválido.',{cause:error});}
+    const filePath=join(packages,fileName);
+    if(!(await exists(filePath)))return Object.freeze({...metadata,health:'missing'});
+    const cli=await ensureCli();
+    try{await execFileImpl(cli,['verify',filePath],{windowsHide:true,maxBuffer:8*1024*1024});}
+    catch{return Object.freeze({...metadata,health:'corrupt',errorCode:'MAP_PACKAGE_CORRUPT'});}
+    const info=await stat(filePath);
+    if(metadata.metadataVersion===1&&Number.isFinite(Number(metadata.size))&&Number(metadata.size)!==info.size)return Object.freeze({...metadata,health:'corrupt',errorCode:'MAP_PACKAGE_CORRUPT'});
+    const digest=await sha256File(filePath);
+    if(metadata.sha256&&metadata.sha256!==digest)return Object.freeze({...metadata,health:'corrupt',errorCode:'MAP_PACKAGE_CORRUPT'});
+    const catalog=await loadCachedCatalog();
+    const upgraded={...metadata,metadataVersion:1,size:info.size,sha256:digest,verifiedAt:now().toISOString(),catalogVersion:metadata.catalogVersion??catalog?.releaseVersion??null};
+    await atomicJson(metadataPath,upgraded);
+    return Object.freeze({...upgraded,health:newerRelease(catalog?.releaseVersion,upgraded.catalogVersion)?'outdated':'healthy'});
+  }
   async function removeFarmMap({id}={}){await init();const clean=safeId(id);if(!clean.startsWith('farm-'))throw new TypeError('Valid farm map id is required.');const metadataPath=join(packages,`${clean}.json`);if(!(await exists(metadataPath)))return{removed:false,id:clean};const metadata=JSON.parse(await readFile(metadataPath,'utf8'));await rm(join(packages,basename(metadata.fileName)),{force:true});await rm(metadataPath,{force:true});return{removed:true,id:clean};}
 
-  return Object.freeze({snapshot,refreshCatalog,resolveRecentSource,installFarmMap,removeFarmMap,ensureCli,manifestUrl:DEFAULT_MANIFEST_URL});
+  return Object.freeze({snapshot,refreshCatalog,resolveRecentSource,installFarmMap,verifyFarmMap,removeFarmMap,ensureCli,manifestUrl:DEFAULT_MANIFEST_URL});
 }
 
 export const MAP_PACKAGE_CONSTANTS=Object.freeze({PMTILES_VERSION,WINDOWS_X64_ASSET,DEFAULT_MANIFEST_URL});

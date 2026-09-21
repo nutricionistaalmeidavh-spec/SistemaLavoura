@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {createMapPackageManager,MapPackageError,normalizeMapPackageError,MAP_PACKAGE_CONSTANTS} from '../runtime/map-package-manager.mjs';
+import {buildAgriculturalMapSnapshot} from '../src/agricultural-map.js';
 
 const exists=async path=>{try{await access(path);return true;}catch{return false;}};
 const sha=value=>createHash('sha256').update(value).digest('hex');
@@ -153,4 +154,34 @@ test('P8 keeps intact PMTiles when its metadata JSON is damaged',async()=>{
   const snapshot=await manager.snapshot();
   assert.equal(await exists(file),true);
   assert.ok(snapshot.recoveryIssues.some(issue=>issue.code==='MAP_PACKAGE_CORRUPT'));
+});
+
+test('P8 keeps valid unclosed manual geometry readable without rewriting persistence',()=>{
+  const stored={fieldId:'f1',type:'Polygon',coordinates:[[0,0],[1,0],[1,1],[0,1]]};
+  const snapshot=buildAgriculturalMapSnapshot({fields:[{id:'f1',name:'Manual'}],geometries:[stored]});
+  assert.equal(snapshot.fields.length,1);
+  assert.deepEqual(stored.coordinates,[[0,0],[1,0],[1,1],[0,1]]);
+});
+
+test('P8 isolates malformed legacy geometry while valid fields continue rendering',()=>{
+  const snapshot=buildAgriculturalMapSnapshot({fields:[{id:'good'},{id:'bad'}],geometries:[{fieldId:'good',type:'Polygon',coordinates:[[0,0],[1,0],[1,1],[0,1]]},{fieldId:'bad',type:'Polygon',coordinates:[[999,999],[1,0],[1,1]]}]});
+  assert.equal(snapshot.fields.length,1);
+  const invalid=snapshot.unmappedFields.find(item=>item.id==='bad');
+  assert.equal(invalid.invalidGeometry,true);
+  assert.equal(invalid.reason,'invalid-geometry');
+});
+
+test('P8 builds a 5000-field snapshot with complete indexed summaries',()=>{
+  const count=5000;
+  const fields=Array.from({length:count},(_,index)=>({id:`f${index}`,areaHa:1}));
+  const geometries=Array.from({length:count},(_,index)=>({fieldId:`f${index}`,type:'Polygon',coordinates:[[index/10000,0],[index/10000+.00005,0],[index/10000+.00005,.00005],[index/10000,.00005]]}));
+  const operations=Array.from({length:count},(_,index)=>({id:`o${index}`,fieldId:`f${index}`,status:'planned'}));
+  const scouting=Array.from({length:count},(_,index)=>({id:`s${index}`,fieldId:`f${index}`,status:'open'}));
+  const started=Date.now();
+  const snapshot=buildAgriculturalMapSnapshot({fields,geometries,operations,scouting});
+  const elapsed=Date.now()-started;
+  assert.equal(snapshot.fields.length,count);
+  assert.equal(snapshot.fields[4321].summary.plannedOperations,1);
+  assert.equal(snapshot.fields[4321].summary.openScouting,1);
+  assert.ok(elapsed<10000,`elapsed=${elapsed}ms`);
 });

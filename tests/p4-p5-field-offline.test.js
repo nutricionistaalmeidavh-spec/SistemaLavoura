@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createFieldObservation,measureDistanceMeters,measureAreaHa,buildFieldModeSnapshot} from '../src/field-mode.js';
-import {farmBoundsFromGeometries,buildFarmMapDownloadPlan,validateMapManifest} from '../src/map-package-planner.js';
+import {farmBoundsFromGeometries,buildFarmMapDownloadPlan,validateMapManifest,boundsFullyCovered} from '../src/map-package-planner.js';
 
 const field={id:'f1',code:'T-01',name:'Talhão Norte',farmUnitId:'farm-1',areaHa:42.5};
 const geometry={fieldId:'f1',type:'Polygon',coordinates:[[-47.91,-21.22],[-47.89,-21.22],[-47.89,-21.20],[-47.91,-21.20]]};
@@ -72,6 +72,24 @@ test('P5 validates manifest contract and builds farm-only extraction profiles',(
 test('P5 fails closed if no published map package covers the farm',()=>{
   const unavailable={...manifest,maps:manifest.maps.map(item=>item.id==='sp'||item.id==='mg'?{...item,available:false}:item)};
   assert.throws(()=>buildFarmMapDownloadPlan({farmUnitId:'farm-1',fields:[field],geometries:[geometry],manifest:unavailable,profile:'detailed'}),/cover/i);
+});
+
+test('P8 covers a farm rectangle with adjacent state bounds including shared edges',()=>{
+  assert.equal(boundsFullyCovered([0,0,2,1],[[0,0,1,1],[1,0,2,1]]),true);
+  assert.equal(boundsFullyCovered([0,0,2,1],[[0,0,1,1]]),false);
+});
+
+test('P8 requires all intersecting state packages needed for complete farm coverage',()=>{
+  const fields=[{id:'cross',farmUnitId:'farm-cross'}];
+  const geometries=[{fieldId:'cross',type:'Polygon',coordinates:[[0.25,0.25],[1.75,0.25],[1.75,0.75],[0.25,0.75]]}];
+  const multi={schemaVersion:1,releaseVersion:'2026.09.1',generatedAt:'2026-09-20T16:23:00Z',source:{provider:'OpenStreetMap',license:'ODbL-1.0'},maps:[
+    {id:'left',name:'Left',kind:'state',available:true,version:'2026.09.1',asset:'left.pmtiles',size:1000,sha256:'d'.repeat(64),minZoom:7,maxZoom:14,bounds:[0,0,1,1],sourceDate:'2026-09-20'},
+    {id:'right',name:'Right',kind:'state',available:true,version:'2026.09.1',asset:'right.pmtiles',size:1000,sha256:'e'.repeat(64),minZoom:7,maxZoom:14,bounds:[1,0,2,1],sourceDate:'2026-09-20'}
+  ]};
+  const plan=buildFarmMapDownloadPlan({farmUnitId:'farm-cross',fields,geometries,manifest:multi,profile:'detailed'});
+  assert.deepEqual(plan.sources.map(source=>source.id),['left','right']);
+  const incomplete={...multi,maps:multi.maps.map(item=>item.id==='right'?{...item,available:false}:item)};
+  assert.throws(()=>buildFarmMapDownloadPlan({farmUnitId:'farm-cross',fields,geometries,manifest:incomplete,profile:'detailed'}),/complete map coverage/i);
 });
 
 test('P4/P5 UI wiring includes field mode, offline maps and PWA registration',()=>{

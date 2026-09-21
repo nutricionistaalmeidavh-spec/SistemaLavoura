@@ -1,0 +1,45 @@
+name: P8 map robustness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/map-package-manager.mjs'
+      - 'src/map-package-planner.js'
+      - 'src/gis-import.js'
+      - 'src/agricultural-map.js'
+      - 'src/presentation-p5.js'
+      - 'web/ui/offline-maps.jsx'
+      - 'web/ui/offline-maps.css'
+      - 'tooling/qa-web.mjs'
+      - 'tests/p8-map-robustness.test.js'
+      - 'tests/p8-map-ui.test.js'
+      - 'tests/qa-web-evidence.test.js'
+      - 'tests/e2e/p8-map-robustness.spec.mjs'
+      - '.github/workflows/p8-map-robustness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run full unit and contract suite
+        run: npm test
+      - name: Build web product
+        run: npm run build:web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated P8 browser journey
+        run: npx playwright test tests/e2e/p8-map-robustness.spec.mjs
+      - name: Verify compatibility contract
+        run: npm run compat:contract

@@ -16,7 +16,33 @@ function validatePosition(position,path='coordinate'){
 function mapCoordinates(value,depth,path){if(depth===0)return validatePosition(value,path);if(!Array.isArray(value)||value.length===0)throw new TypeError(`${path} coordinates are empty or invalid.`);return Object.freeze(value.map((item,index)=>mapCoordinates(item,depth-1,`${path}[${index}]`)));}
 function coordinateDepth(type){switch(type){case'Point':return 0;case'MultiPoint':case'LineString':return 1;case'MultiLineString':case'Polygon':return 2;case'MultiPolygon':return 3;default:return null;}}
 function samePosition(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length>=2&&b.length>=2&&a[0]===b[0]&&a[1]===b[1];}
-function validateRing(ring,path){if(!Array.isArray(ring)||ring.length<4)throw new TypeError(`${path} Polygon ring requires at least four positions.`);if(!samePosition(ring[0],ring.at(-1)))throw new TypeError(`${path} Polygon ring must be closed.`);}
+const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+const between=(value,a,b)=>value>=Math.min(a,b)-1e-12&&value<=Math.max(a,b)+1e-12;
+const onSegment=(a,b,p)=>Math.abs(cross(a,b,p))<=1e-12&&between(p[0],a[0],b[0])&&between(p[1],a[1],b[1]);
+function segmentsIntersect(a,b,c,d){
+  const abC=cross(a,b,c),abD=cross(a,b,d),cdA=cross(c,d,a),cdB=cross(c,d,b);
+  if(((abC>0&&abD<0)||(abC<0&&abD>0))&&((cdA>0&&cdB<0)||(cdA<0&&cdB>0)))return true;
+  return onSegment(a,b,c)||onSegment(a,b,d)||onSegment(c,d,a)||onSegment(c,d,b);
+}
+const ringArea=ring=>Math.abs(ring.slice(0,-1).reduce((sum,point,index)=>{const next=ring[index+1];return sum+point[0]*next[1]-next[0]*point[1];},0))/2;
+
+export function validatePolygonRingTopology(ring,path='ring'){
+  if(!Array.isArray(ring)||ring.length<4)throw new TypeError(`${path} Polygon ring requires at least four positions.`);
+  if(!samePosition(ring[0],ring.at(-1)))throw new TypeError(`${path} Polygon ring must be closed.`);
+  const unique=new Set(ring.slice(0,-1).map(point=>`${point[0]},${point[1]}`));
+  if(unique.size<3||ringArea(ring)<=1e-14)throw new TypeError(`${path} Polygon ring is degenerate.`);
+  const segmentCount=ring.length-1;
+  for(let first=0;first<segmentCount;first+=1){
+    for(let second=first+1;second<segmentCount;second+=1){
+      const adjacent=second===first+1||(first===0&&second===segmentCount-1);
+      if(adjacent)continue;
+      if(segmentsIntersect(ring[first],ring[first+1],ring[second],ring[second+1]))throw new TypeError(`${path} Polygon ring is self-intersecting.`);
+    }
+  }
+  return ring;
+}
+
+function validateRing(ring,path){validatePolygonRingTopology(ring,path);}
 function validatePolygonStructure(type,coordinates,path){const polygons=type==='Polygon'?[coordinates]:coordinates;for(const[polygonIndex,polygon]of polygons.entries()){if(!Array.isArray(polygon)||polygon.length===0)throw new TypeError(`${path} Polygon is empty.`);for(const[ringIndex,ring]of polygon.entries())validateRing(ring,`${path}[${polygonIndex}][${ringIndex}]`);}}
 
 export function normalizeGisGeometry(geometry,path='geometry'){

@@ -13,7 +13,7 @@ test('P5 mostra gerenciador de mapas e mantém fallback seguro no PWA',async({pa
   const workspace=page.getByTestId('offline-maps-workspace');
   await expect(workspace).toBeVisible();
   await expect(workspace.getByText('Disponibilizar fazenda offline')).toBeVisible();
-  await expect(workspace.getByText('Somente no desktop Windows')).toBeVisible();
+  await expect(workspace.getByText('Somente no desktop Windows',{exact:true})).toBeVisible();
   await expect(workspace.getByRole('button',{name:'Baixar mapa desta fazenda'})).toBeDisabled();
   await expect(workspace.getByText(/Modo Campo continua funcionando/)).toBeVisible();
 });

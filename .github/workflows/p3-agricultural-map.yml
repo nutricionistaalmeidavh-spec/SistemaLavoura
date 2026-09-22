@@ -15,6 +15,9 @@ on:
       - 'runtime/host.mjs'
       - 'tests/p3-agricultural-map.test.js'
       - 'tests/e2e/p3-agricultural-map.spec.mjs'
+      - 'package.json'
+      - '.release/**'
+      - '.github/workflows/release-*.yml'
       - '.github/workflows/p3-agricultural-map.yml'
   workflow_dispatch:
 

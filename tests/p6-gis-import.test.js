@@ -51,6 +51,12 @@ test('P6 map snapshot and renderer preserve all MultiPolygon parts',()=>{
   assert.match(renderer,/\.map\(\(ring/);
 });
 
+test('P6 file picker uses the native input event and a stable test id',()=>{
+  const ui=fs.readFileSync(new URL('../web/ui/gis-import.jsx',import.meta.url),'utf8');
+  assert.match(ui,/data-testid="gis-file-input"/);
+  assert.match(ui,/onInput=\{event=>analyze\(event\.currentTarget\.files\?\.\[0\]\)\}/);
+});
+
 test('P8 rejects self-intersecting and zero-area GIS polygons',()=>{
   assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[2,2],[0,2],[2,0],[0,0]]]}),/self-intersect/i);
   assert.throws(()=>normalizeGisGeometry({type:'Polygon',coordinates:[[[0,0],[1,0],[2,0],[0,0]]]}),/degenerate|area/i);

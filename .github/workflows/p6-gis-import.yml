@@ -19,6 +19,8 @@ on:
       - 'tests/p6*.test.js'
       - 'tests/e2e/p6-gis-import.spec.mjs'
       - 'package.json'
+      - '.release/**'
+      - '.github/workflows/release-*.yml'
       - '.github/workflows/p6-gis-import.yml'
   workflow_dispatch:
 

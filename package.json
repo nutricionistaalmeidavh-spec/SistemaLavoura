@@ -1,14 +1,96 @@
 {
-  "name":"@artisys-products/sistema-lavoura","version":"1.0.0-migration.8","private":true,"type":"module","main":"electron/main.mjs","engines":{"node":">=22"},
-  "scripts":{
-    "start":"electron .","dev:web":"vite --config web/vite.config.mjs","build:web":"vite build --config web/vite.config.mjs","preview:web":"vite preview --config web/vite.config.mjs --host 127.0.0.1 --port 4173",
-    "test":"node --test tests/*.test.js","test:domain":"node --test tests/domain.test.js tests/ui.test.js","test:standalone":"node --test tests/standalone-runtime.test.js tests/host.test.js","check:imports":"node tooling/check-standalone-imports.mjs","check":"npm run check:imports && npm test && npm run build:web",
-    "qa:surface":"node tooling/qa-phase5.mjs","qa:p1":"node tooling/qa-p1.mjs","qa:p2":"node tooling/qa-p2.mjs","qa:web:raw":"playwright test","qa:web":"node tooling/qa-web.mjs",
-    "compat:contract":"node tooling/compatibility-check.mjs","compat:legacy":"node tooling/compatibility-check.mjs --require-legacy",
-    "phase5":"npm run check && npm run qa:surface && npm run qa:web","p1":"npm run phase5 && npm run qa:p1 && npm run compat:contract","p2":"npm run p1 && npm run qa:p2","phase6":"npm run compat:contract && npm run build:win","phase7":"node tooling/phase7-cutover.mjs","phase8:certify":"node tooling/certify-release.mjs",
-    "cutover:verify":"npm run phase5 && npm run compat:legacy && npm run build:win","build:win":"npm run build:web && electron-builder --win nsis --x64 --publish never","release:win":"npm run phase5 && npm run phase6","release:certify":"npm run phase5 && npm run phase7 && npm run qa:web && npm run check && npm run build:win && npm run phase8:certify"
+  "name": "@artisys-products/sistema-lavoura",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
   },
-  "dependencies":{"@tmcw/togeojson":"^7.1.2","@xmldom/xmldom":"^0.8.11","fflate":"^0.8.3","geotiff":"^3.0.5","isoxml":"^1.11.2","react":"^19.1.1","react-dom":"^19.1.1","shpjs":"^6.2.0"},
-  "devDependencies":{"@playwright/test":"^1.55.0","electron":"^44.3.0","electron-builder":"^26.0.12","vite":"^7.3.6"},
-  "build":{"appId":"dev.artisys.lavoura","productName":"ArtiSys Lavoura","directories":{"output":"release"},"files":["dist/**/*","electron/**/*","runtime/**/*","src/**/*","shared/**/*","migrations/**/*","seeds/**/*","branding/**/*","persistence/**/*","package.json"],"win":{"target":["nsis"],"artifactName":"ArtiSys-Lavoura-Setup-${version}.${ext}"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}
+  "scripts": {
+    "start": "electron .",
+    "dev:web": "vite --config web/vite.config.mjs",
+    "build:web": "vite build --config web/vite.config.mjs",
+    "preview:web": "vite preview --config web/vite.config.mjs --host 127.0.0.1 --port 4173",
+    "test": "node --test tests/*.test.js",
+    "test:domain": "node --test tests/domain.test.js tests/ui.test.js",
+    "test:standalone": "node --test tests/standalone-runtime.test.js tests/host.test.js",
+    "check:imports": "node tooling/check-standalone-imports.mjs",
+    "check": "npm run check:imports && npm test && npm run build:web",
+    "qa:surface": "node tooling/qa-phase5.mjs",
+    "qa:p1": "node tooling/qa-p1.mjs",
+    "qa:p2": "node tooling/qa-p2.mjs",
+    "qa:web:raw": "playwright test",
+    "qa:web": "node tooling/qa-web.mjs",
+    "compat:contract": "node tooling/compatibility-check.mjs",
+    "compat:legacy": "node tooling/compatibility-check.mjs --require-legacy",
+    "phase5": "npm run check && npm run qa:surface && npm run qa:web",
+    "p1": "npm run phase5 && npm run qa:p1 && npm run compat:contract",
+    "p2": "npm run p1 && npm run qa:p2",
+    "phase6": "npm run compat:contract && npm run build:win",
+    "phase7": "node tooling/phase7-cutover.mjs",
+    "phase8:certify": "node tooling/certify-release.mjs",
+    "cutover:verify": "npm run phase5 && npm run compat:legacy && npm run build:win",
+    "build:win": "npm run build:web && electron-builder --win nsis --x64 --publish never",
+    "release:win": "npm run phase5 && npm run phase6",
+    "release:certify": "npm run phase5 && npm run phase7 && npm run qa:web && npm run check && npm run build:win && npm run phase8:certify"
+  },
+  "dependencies": {
+    "@tmcw/togeojson": "^7.1.2",
+    "@xmldom/xmldom": "^0.8.11",
+    "fflate": "^0.8.3",
+    "geotiff": "^3.0.5",
+    "isoxml": "^1.11.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "shpjs": "^6.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.0.12",
+    "vite": "^7.3.6"
+  },
+  "build": {
+    "appId": "dev.artisys.lavoura",
+    "productName": "ArtiSys Lavoura",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "runtime/**/*",
+      "src/**/*",
+      "shared/**/*",
+      "migrations/**/*",
+      "seeds/**/*",
+      "branding/**/*",
+      "persistence/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "TRADEMARKS.md",
+        "to": "TRADEMARKS.md"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "ArtiSys-Lavoura-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
 }

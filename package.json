@@ -70,6 +70,16 @@
       "persistence/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "TRADEMARKS.md",
+        "to": "TRADEMARKS.md"
+      }
+    ],
     "win": {
       "target": [
         "nsis"

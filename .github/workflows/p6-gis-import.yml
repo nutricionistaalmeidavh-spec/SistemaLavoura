@@ -18,6 +18,7 @@ on:
       - 'runtime/host.mjs'
       - 'tests/p6*.test.js'
       - 'tests/e2e/p6-gis-import.spec.mjs'
+      - 'tests/release-v1.test.js'
       - 'package.json'
       - '.release/**'
       - '.github/workflows/release-*.yml'

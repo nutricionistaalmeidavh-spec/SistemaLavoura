@@ -41,3 +41,8 @@ test('clean-install Electron smoke uses an explicit process exit code',async()=>
   assert.match(smoke,/\$runtimeProcess\s*=\s*Start-Process[\s\S]*?-Wait\s+-PassThru/);
   assert.match(smoke,/\$runtimeProcess\.ExitCode/);
 });
+
+test('v1.0.0 workflow reruns when its own definition changes',async()=>{
+  const workflow=await text('.github/workflows/release-v1.0.0.yml');
+  assert.match(workflow,/paths:[\s\S]*?\.release\/v1\.0\.0\.json[\s\S]*?\.github\/workflows\/release-v1\.0\.0\.yml/);
+});

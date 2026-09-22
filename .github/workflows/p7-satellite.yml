@@ -18,6 +18,8 @@ on:
       - 'tests/p6-p7-presentation.test.js'
       - 'tests/e2e/p7-satellite.spec.mjs'
       - 'package.json'
+      - '.release/**'
+      - '.github/workflows/release-*.yml'
       - '.github/workflows/p7-satellite.yml'
   workflow_dispatch:
 

@@ -30,3 +30,14 @@ test('stable release workflow refuses to replace an existing published release',
   assert.doesNotMatch(workflow,/--clobber/);
   assert.match(workflow,/already exists|já existe/i);
 });
+
+test('clean-install Electron smoke uses an explicit process exit code',async()=>{
+  const workflow=await text('.github/workflows/release-v1.0.0.yml');
+  const start=workflow.indexOf('- name: Smoke-test installer on clean Windows runner');
+  const end=workflow.indexOf('- name: Generate SHA-256 checksum');
+  assert.ok(start>=0&&end>start,'release workflow must contain the clean-install smoke block');
+  const smoke=workflow.slice(start,end);
+  assert.doesNotMatch(smoke,/\$runtimeExit\s*=\s*\$LASTEXITCODE/);
+  assert.match(smoke,/\$runtimeProcess\s*=\s*Start-Process[\s\S]*?-Wait\s+-PassThru/);
+  assert.match(smoke,/\$runtimeProcess\.ExitCode/);
+});

@@ -46,3 +46,8 @@ test('v1.0.0 workflow reruns when its own definition changes',async()=>{
   const workflow=await text('.github/workflows/release-v1.0.0.yml');
   assert.match(workflow,/paths:[\s\S]*?\.release\/v1\.0\.0\.json[\s\S]*?\.github\/workflows\/release-v1\.0\.0\.yml/);
 });
+
+test('stable v1.0.0 publication is restricted to a push on main',async()=>{
+  const workflow=await text('.github/workflows/release-v1.0.0.yml');
+  assert.match(workflow,/- name: Publish immutable GitHub release\n\s+if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+});

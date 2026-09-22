@@ -15,6 +15,7 @@ on:
       - 'runtime/host.mjs'
       - 'tests/p3-agricultural-map.test.js'
       - 'tests/e2e/p3-agricultural-map.spec.mjs'
+      - 'tests/release-v1.test.js'
       - 'package.json'
       - '.release/**'
       - '.github/workflows/release-*.yml'

@@ -17,7 +17,10 @@ on:
       - 'tests/p7*.test.js'
       - 'tests/p6-p7-presentation.test.js'
       - 'tests/e2e/p7-satellite.spec.mjs'
+      - 'tests/release-v1.test.js'
       - 'package.json'
+      - '.release/**'
+      - '.github/workflows/release-*.yml'
       - '.github/workflows/p7-satellite.yml'
   workflow_dispatch:
 

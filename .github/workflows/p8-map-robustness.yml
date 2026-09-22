@@ -16,6 +16,7 @@ on:
       - 'tests/p8-map-ui.test.js'
       - 'tests/qa-web-evidence.test.js'
       - 'tests/e2e/p8-map-robustness.spec.mjs'
+      - 'tests/release-v1.test.js'
       - 'package.json'
       - '.release/**'
       - '.github/workflows/release-*.yml'

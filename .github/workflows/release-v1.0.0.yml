@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .release/v1.0.0.json
+      - .github/workflows/release-v1.0.0.yml
   workflow_dispatch:
 
 permissions:
@@ -98,10 +99,12 @@ jobs:
           if (-not (Test-Path $appExe)) { throw "Installed executable not found: $appExe" }
 
           $env:ELECTRON_RUN_AS_NODE = '1'
-          & $appExe -e "if(!process.versions.electron){process.exit(2)}; console.log('Electron',process.versions.electron)"
-          $runtimeExit = $LASTEXITCODE
-          Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-          if ($runtimeExit -ne 0) { throw "Installed Electron runtime smoke test failed with code $runtimeExit" }
+          try {
+            $runtimeProcess = Start-Process -FilePath $appExe -ArgumentList '-e', 'if(!process.versions.electron){process.exit(2)};process.exit(0)' -Wait -PassThru
+          } finally {
+            Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          }
+          if ($runtimeProcess.ExitCode -ne 0) { throw "Installed Electron runtime smoke test failed with code $($runtimeProcess.ExitCode)" }
 
           $process = Start-Process -FilePath $appExe -PassThru
           Start-Sleep -Seconds 10
@@ -135,6 +138,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish immutable GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

@@ -23,7 +23,7 @@ test('P6 importa GeoJSON localmente, salva camada e aplica limite ao talhão',as
   await expect(page.getByText('Talhão Importado',{exact:true}).first()).toBeVisible();
   await page.getByTestId('nav-gis-import').click();
   await expect(page.getByTestId('gis-import-workspace')).toBeVisible();
-  await page.locator('input[type="file"]').setInputFiles(GIS_FIXTURE);
+  await page.getByTestId('gis-file-input').setInputFiles(GIS_FIXTURE);
   await expect(page.getByTestId('gis-preview')).toBeVisible();
   await expect(page.getByText('Feições').locator('..').getByText('1',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Salvar camada',exact:true}).click();

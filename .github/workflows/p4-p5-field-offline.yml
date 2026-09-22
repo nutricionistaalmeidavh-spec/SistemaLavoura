@@ -24,6 +24,9 @@ on:
       - 'tests/map-package-manager.test.js'
       - 'tests/e2e/p4-field-mode.spec.mjs'
       - 'tests/e2e/p5-offline-maps.spec.mjs'
+      - 'package.json'
+      - '.release/**'
+      - '.github/workflows/release-*.yml'
       - '.github/workflows/p4-p5-field-offline.yml'
   workflow_dispatch:
 

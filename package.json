@@ -17,7 +17,7 @@
     "test:domain": "node --test tests/domain.test.js tests/ui.test.js",
     "test:standalone": "node --test tests/standalone-runtime.test.js tests/host.test.js",
     "check:imports": "node tooling/check-standalone-imports.mjs",
-    "check": "npm run check:imports && npm test && npm run build:web",
+    "check": "npm run check:imports && npm run qa:editions && npm test && npm run build:web",
     "qa:surface": "node tooling/qa-phase5.mjs",
     "qa:p1": "node tooling/qa-p1.mjs",
     "qa:p2": "node tooling/qa-p2.mjs",
@@ -34,7 +34,8 @@
     "cutover:verify": "npm run phase5 && npm run compat:legacy && npm run build:win",
     "build:win": "npm run build:web && electron-builder --win nsis --x64 --publish never",
     "release:win": "npm run phase5 && npm run phase6",
-    "release:certify": "npm run phase5 && npm run phase7 && npm run qa:web && npm run check && npm run build:win && npm run phase8:certify"
+    "release:certify": "npm run phase5 && npm run phase7 && npm run qa:web && npm run check && npm run build:win && npm run phase8:certify",
+    "qa:editions": "node tooling/qa-editions.mjs"
   },
   "dependencies": {
     "@tmcw/togeojson": "^7.1.2",

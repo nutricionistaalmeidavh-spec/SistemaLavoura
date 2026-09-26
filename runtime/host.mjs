@@ -13,7 +13,7 @@ const migrationDir=fileURLToPath(new URL('../migrations/',import.meta.url));
 const safeId=(value)=>String(value??new Date().toISOString()).replace(/[^a-zA-Z0-9._-]/g,'-');
 const isAuditCollection=(name)=>String(name).startsWith('security-audit:');
 
-export async function createStandaloneHost({dataDir,backupDir=join(dataDir,'backups')}={}){
+export async function createStandaloneHost({dataDir,backupDir=join(dataDir,'backups'),edition='complete',licenseFeatures={}}={}){
   if(typeof dataDir!=='string'||!dataDir.trim())throw new TypeError('dataDir is required.');
   await mkdir(dataDir,{recursive:true});
   await mkdir(backupDir,{recursive:true});
@@ -30,6 +30,6 @@ export async function createStandaloneHost({dataDir,backupDir=join(dataDir,'back
   const mapPackages=createMapPackageManager({dataDir});
   const presentation=createAgroLavouraPresentation({persistence,recovery,mapPackages});
   const iot=createSqliteIoTReadProvider({dbPath,persistence,alerts:presentation.services.alerts});
-  const backend=createRpcBackend({presentation,iot});
+  const backend=createRpcBackend({presentation,iot,edition,licenseFeatures});
   return Object.freeze({productId:PRODUCT_ID,dbPath,backupDir,persistence,recovery,mapPackages,presentation,iot,backend,async close(){const old=current;current=null;await old?.close?.();}});
 }

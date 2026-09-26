@@ -13,7 +13,8 @@ async function resolveBackend(){
   const persistence=createBrowserPersistence({productId:'agro-lavoura'});
   const recovery=createBrowserRecovery(persistence,{productId:'agro-lavoura'});
   const presentation=createAgroLavouraPresentation({persistence,recovery,mapPackages:null});
-  return createRpcBackend({presentation});
+  const edition=String(import.meta.env.VITE_ARTISYS_EDITION||'complete');
+  return createRpcBackend({presentation,edition});
 }
 
 function Bootstrap(){

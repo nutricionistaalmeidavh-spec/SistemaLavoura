@@ -12,7 +12,7 @@ export function LavouraShell({meta,currentScreenId,onSelectScreen,title,onReload
     <aside className="sidebar" aria-label="Navegação principal">
       <div className="brand-block">
         <div className="brand-mark"><Icon name="leaf" size={25}/></div>
-        <div className="brand-copy"><strong>{brand.shortName??'Sistema Lavoura'}</strong><small>{brand.productName??brand.name}</small></div>
+        <div className="brand-copy"><strong>{brand.shortName??'Sistema Lavoura'}</strong><small>{brand.productName??brand.name} · {meta?.edition==='essential'?'Essencial':meta?.edition==='management'?'Gestão':'Completo'}</small></div>
       </div>
       <nav className="sidebar-nav">{nav()}</nav>
       <div className="sidebar-foot"><span className="local-dot"/> Dados locais <span>·</span> offline-first</div>

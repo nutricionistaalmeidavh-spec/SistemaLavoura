@@ -1,4 +1,6 @@
 import {createCommandDispatcher} from './commands.mjs';
+import {resolveEntitlements} from '../src/entitlements.js';
+import {capabilityForScreen,capabilityForAction,assertEntitled} from '../src/edition-policy.js';
 
 const credentials=(auth={})=>({sessionId:auth.sessionId,token:auth.token});
 const cleanScreen=(screen)=>({id:screen.id,title:screen.title,kind:screen.kind,actionDefinitions:screen.actionDefinitions??{}});
@@ -17,10 +19,22 @@ const safeIoTRule=rule=>Object.freeze({id:rule?.id,name:rule?.name,type:rule?.ty
 const safeIoTAlert=alert=>Object.freeze({id:alert?.id,title:alert?.title,severity:alert?.severity??'info',status:alert?.status??'active',read:alert?.read??alert?.status!=='active',occurredAt:alert?.occurredAt??alert?.createdAt??alert?.dueAt??null,deviceId:alert?.deviceId??alert?.metadata?.deviceId??null,ruleId:alert?.ruleId??alert?.metadata?.ruleId??null});
 const fieldOption=record=>{const row=record?.payload??record;return Object.freeze({value:String(row?.id),label:String(row?.name??row?.code??row?.id)});};
 
-export function createRpcBackend({presentation,iot=null}){
+export function createRpcBackend({presentation,iot=null,edition='complete',licenseFeatures={}}){
   if(!presentation?.screen||!presentation?.services?.security)throw new TypeError('Functional presentation with security is required.');
   const security=presentation.services.security;
-  const commands=createCommandDispatcher({presentation});
+  const entitlements=resolveEntitlements({edition,licenseFeatures});
+  const commands=createCommandDispatcher({presentation,entitlements});
+  const requireScreen=id=>assertEntitled(entitlements,capabilityForScreen(id),{screenId:id});
+  const requireAction=(screenId,action)=>assertEntitled(entitlements,capabilityForAction(screenId,action),{screenId,action});
+  const sanitizeData=(screenId,value)=>{
+    if(!value||typeof value!=='object')return value;
+    const out={...value};
+    if(!entitlements.enabled('finance')){delete out.financial;delete out.costs;delete out.finance;delete out.entries;delete out.budget;delete out.results;delete out.commercial;if(out.cards)out.cards={...out.cards,resultMinor:null};}
+    if(!entitlements.enabled('inventory')){delete out.inventory;delete out.stock;delete out.requirements;if(out.cards)out.cards={...out.cards,lowStock:null};}
+    if(!entitlements.enabled('files'))delete out.files;
+    if(!entitlements.enabled('checklists'))delete out.checklists;
+    return Object.freeze(out);
+  };
   async function requireSession(auth,permission=null){
     const c=credentials(auth);
     if(permission)return security.authorize({...c,permission});
@@ -37,7 +51,7 @@ export function createRpcBackend({presentation,iot=null}){
     const [users,usersWrite,auditRead,passwordChange]=await Promise.all([
       security.listUsers(c),
       allowed(auth,'users:write'),
-      allowed(auth,'audit:read'),
+      entitlements.enabled('audit')?allowed(auth,'audit:read'):false,
       allowed(auth,'session:revoke')
     ]);
     const audit=auditRead?await security.listAudit(c):[];
@@ -86,16 +100,16 @@ export function createRpcBackend({presentation,iot=null}){
     return execution.result;
   }
   async function describe(auth=null){
-    const baseNavigation=presentation.shell.navigation.map(item=>({...item}));
-    const baseScreens=presentation.screenIds().map(id=>cleanScreen(presentation.screen(id)));
-    if(!auth)return {productId:security.productId,brand:presentation.shell.brand,navigation:baseNavigation,screens:baseScreens};
+    const baseNavigation=presentation.shell.navigation.filter(item=>entitlements.enabled(capabilityForScreen(item.id))).map(item=>({...item}));
+    const baseScreens=presentation.screenIds().filter(id=>entitlements.enabled(capabilityForScreen(id))).map(id=>cleanScreen(presentation.screen(id)));
+    if(!auth)return {productId:security.productId,edition:entitlements.edition,brand:presentation.shell.brand,navigation:baseNavigation,screens:baseScreens};
     const navigation=[],screens=[];
     for(const item of baseNavigation){
       if(await allowed(auth,permissionFor(item.id,'read'))){navigation.push(item);const screen=baseScreens.find(value=>value.id===item.id);if(screen)screens.push(screen);}
     }
-    if(await allowed(auth,'iot:read')){navigation.push({...IOT_NAVIGATION});screens.push({...IOT_SCREEN});}
-    if(await allowed(auth,'users:read')){navigation.push({...ADMIN_NAVIGATION});screens.push({...ADMIN_SCREEN});}
-    return {productId:security.productId,brand:presentation.shell.brand,navigation,screens};
+    if(entitlements.enabled('iot')&&await allowed(auth,'iot:read')){navigation.push({...IOT_NAVIGATION});screens.push({...IOT_SCREEN});}
+    if(entitlements.enabled('admin')&&await allowed(auth,'users:read')){navigation.push({...ADMIN_NAVIGATION});screens.push({...ADMIN_SCREEN});}
+    return {productId:security.productId,edition:entitlements.edition,brand:presentation.shell.brand,navigation,screens};
   }
   return Object.freeze({
     describe,
@@ -105,12 +119,13 @@ export function createRpcBackend({presentation,iot=null}){
     async validate(auth){return requireSession(auth);},
     async logout(auth){return security.revoke(credentials(auth));},
     async load({screenId,auth,context={}}={}){
+      requireScreen(screenId);
       if(screenId==='admin')return adminSnapshot(auth);
       if(screenId==='iot')return iotSnapshot(auth);
       await requireSession(auth,permissionFor(screenId,'read'));
       if(screenId==='overview'&&typeof iot?.refreshAlerts==='function'&&await allowed(auth,'iot:read'))await iot.refreshAlerts();
-      return presentation.load(screenId,context);
+      return sanitizeData(screenId,await presentation.load(screenId,context));
     },
-    async action({screenId,action,input={},auth,context={}}={}){if(screenId==='admin')return adminAction({action,input,auth});if(screenId==='iot')return iotAction({action,input,auth});return commands.execute({screenId,action,input,auth,context});}
+    async action({screenId,action,input={},auth,context={}}={}){requireAction(screenId,action);if(screenId==='admin')return adminAction({action,input,auth});if(screenId==='iot')return iotAction({action,input,auth});return commands.execute({screenId,action,input,auth,context});}
   });
 }

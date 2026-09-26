@@ -1,10 +1,12 @@
+import {capabilityForAction,assertEntitled} from '../src/edition-policy.js';
+
 const credentials=(auth={})=>({sessionId:auth.sessionId,token:auth.token});
 const keyOf=(screenId,action)=>`${String(screenId)}.${String(action)}`;
 const NON_TRANSACTIONAL=new Set(['reports.csv','settings.backup','settings.restore']);
 const clone=value=>value==null?value:structuredClone(value);
 const entityIdOf=(input,result)=>input?.id??result?.id??result?.payload?.id??result?.record?.id??result?.record?.payload?.id??null;
 
-export function createCommandDispatcher({presentation}={}){
+export function createCommandDispatcher({presentation,entitlements=null}={}){
   if(!presentation?.action||!presentation?.services?.security)throw new TypeError('Functional presentation with security is required.');
   const security=presentation.services.security;
   const persistence=presentation.services.persistence;
@@ -13,6 +15,7 @@ export function createCommandDispatcher({presentation}={}){
 
   return Object.freeze({
     async execute({screenId,action,input={},auth,context={}}={}){
+      if(entitlements)assertEntitled(entitlements,capabilityForAction(screenId,action),{screenId,action});
       const command=keyOf(screenId,action);
       const transactional=!NON_TRANSACTIONAL.has(command)&&typeof persistence?.runInTransaction==='function';
       const commandId=globalThis.crypto?.randomUUID?.()??`command-${Date.now()}-${Math.random().toString(16).slice(2)}`;

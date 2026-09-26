@@ -6,3 +6,8 @@ test('management includes management but excludes advanced precision capabilitie
 test('complete enables all declared capabilities',()=>{assert.ok(Object.values(editionDefaults('complete')).every(Boolean))});
 test('license feature overrides edition default',()=>{const e=resolveEntitlements({edition:'essential',licenseFeatures:{'capability.pdf':true}});assert.equal(e.enabled('pdf'),true);assert.equal(e.enabled('finance'),false)});
 test('lavoura license validates product and edition',()=>{assert.equal(normalizeLavouraLicense({product:'artisys-lavoura',edition:'management'}).edition,'management');assert.throws(()=>normalizeLavouraLicense({product:'other',edition:'complete'}))});
+
+import {canUpgradeEdition,applyLicenseUpgrade} from '../src/license-upgrade.js';
+import {capabilityForScreen,assertEntitled} from '../src/edition-policy.js';
+test('edition policy rejects unavailable screen',()=>{const e=resolveEntitlements({edition:'essential'});assert.throws(()=>assertEntitled(e,capabilityForScreen('finance')),(x)=>x.code==='EDITION_FORBIDDEN')});
+test('upgrade path is monotonic and preserves product',()=>{assert.equal(canUpgradeEdition('essential','management'),true);assert.equal(canUpgradeEdition('management','essential'),false);const next=applyLicenseUpgrade({product:'artisys-lavoura',edition:'essential'},{product:'artisys-lavoura',edition:'complete'});assert.equal(next.edition,'complete')});

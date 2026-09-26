@@ -19,3 +19,7 @@ export { createAgroLavouraPresentation } from './presentation-p7.js';
 export * from './inventory.js';
 export * from './documents.js';
 export * from './security.js';
+
+export * from './editions/index.js';
+export * from './entitlements.js';
+export * from './licensing.js';

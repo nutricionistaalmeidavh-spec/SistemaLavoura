@@ -23,3 +23,6 @@ export * from './security.js';
 export * from './editions/index.js';
 export * from './entitlements.js';
 export * from './licensing.js';
+
+export * from './edition-policy.js';
+export * from './license-upgrade.js';

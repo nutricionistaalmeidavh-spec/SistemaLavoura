@@ -26,6 +26,15 @@ export function createRpcBackend({presentation,iot=null,edition='complete',licen
   const commands=createCommandDispatcher({presentation,entitlements});
   const requireScreen=id=>assertEntitled(entitlements,capabilityForScreen(id),{screenId:id});
   const requireAction=(screenId,action)=>assertEntitled(entitlements,capabilityForAction(screenId,action),{screenId,action});
+  const sanitizeData=(screenId,value)=>{
+    if(!value||typeof value!=='object')return value;
+    const out={...value};
+    if(!entitlements.enabled('finance')){delete out.financial;delete out.costs;delete out.finance;delete out.entries;delete out.budget;delete out.results;delete out.commercial;if(out.cards)out.cards={...out.cards,resultMinor:null};}
+    if(!entitlements.enabled('inventory')){delete out.inventory;delete out.stock;delete out.requirements;if(out.cards)out.cards={...out.cards,lowStock:null};}
+    if(!entitlements.enabled('files'))delete out.files;
+    if(!entitlements.enabled('checklists'))delete out.checklists;
+    return Object.freeze(out);
+  };
   async function requireSession(auth,permission=null){
     const c=credentials(auth);
     if(permission)return security.authorize({...c,permission});
@@ -42,7 +51,7 @@ export function createRpcBackend({presentation,iot=null,edition='complete',licen
     const [users,usersWrite,auditRead,passwordChange]=await Promise.all([
       security.listUsers(c),
       allowed(auth,'users:write'),
-      allowed(auth,'audit:read'),
+      entitlements.enabled('audit')?allowed(auth,'audit:read'):false,
       allowed(auth,'session:revoke')
     ]);
     const audit=auditRead?await security.listAudit(c):[];
@@ -115,7 +124,7 @@ export function createRpcBackend({presentation,iot=null,edition='complete',licen
       if(screenId==='iot')return iotSnapshot(auth);
       await requireSession(auth,permissionFor(screenId,'read'));
       if(screenId==='overview'&&typeof iot?.refreshAlerts==='function'&&await allowed(auth,'iot:read'))await iot.refreshAlerts();
-      return presentation.load(screenId,context);
+      return sanitizeData(screenId,await presentation.load(screenId,context));
     },
     async action({screenId,action,input={},auth,context={}}={}){requireAction(screenId,action);if(screenId==='admin')return adminAction({action,input,auth});if(screenId==='iot')return iotAction({action,input,auth});return commands.execute({screenId,action,input,auth,context});}
   });
